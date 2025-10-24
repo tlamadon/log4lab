@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en" class="dark:bg-gray-900 dark:text-gray-100">
+<head>
+  <meta charset="UTF-8">
+  <title>LogBoard — Live Structured Logs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (localStorage.theme === 'dark' ||
+        (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+  <div class="max-w-6xl mx-auto p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h1 class="text-3xl font-bold">LogBoard <span class="text-sm font-light">(Live)</span></h1>
+      <button id="themeToggle"
+        class="px-3 py-1 rounded border text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
+        Toggle Theme
+      </button>
+    </div>
+
+    <div class="flex space-x-4 mb-4 items-center">
+      <div>
+        <label class="block text-sm font-medium">Level</label>
+        <select id="levelFilter" class="border rounded px-2 py-1 dark:bg-gray-800 dark:border-gray-700">
+          <option value="">All</option>
+          <option value="INFO">INFO</option>
+          <option value="WARN">WARN</option>
+          <option value="ERROR">ERROR</option>
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Section</label>
+        <input id="sectionFilter" type="text"
+               class="border rounded px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+               placeholder="e.g. train" />
+      </div>
+
+      <button id="clearFilters"
+        class="bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 px-3 py-1 rounded">
+        Clear
+      </button>
+    </div>
+
+    <div id="log-container" class="space-y-2"></div>
+  </div>
+
+  <script>
+  const container = document.getElementById("log-container");
+  const source = new EventSource("/stream");
+  const levelFilter = document.getElementById("levelFilter");
+  const sectionFilter = document.getElementById("sectionFilter");
+  const clearBtn = document.getElementById("clearFilters");
+  const themeToggle = document.getElementById("themeToggle");
+  let allLogs = [];
+
+  themeToggle.onclick = () => {
+    const html = document.documentElement;
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      localStorage.theme = 'light';
+    } else {
+      html.classList.add('dark');
+      localStorage.theme = 'dark';
+    }
+  };
+
+  function matchesFilters(entry) {
+    const level = levelFilter.value;
+    const section = sectionFilter.value.toLowerCase();
+    if (level && entry.level !== level) return false;
+    if (section && (!entry.section || !entry.section.toLowerCase().includes(section))) return false;
+    return true;
+  }
+
+  function renderLogs() {
+    container.innerHTML = "";
+    allLogs
+      .filter(matchesFilters)
+      .slice(-200)
+      .reverse()
+      .forEach(renderLog);
+  }
+
+  function renderLog(entry) {
+    const div = document.createElement("div");
+    const border =
+      entry.level === "ERROR" ? "border-red-500" :
+      entry.level === "WARN" ? "border-yellow-400" :
+      "border-blue-400";
+    div.className = `p-3 bg-white dark:bg-gray-800 border-l-4 ${border} rounded shadow-sm transition`;
+    div.innerHTML = `
+      <div class="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+        <span>${entry.time || ''}</span>
+        <span class="font-semibold">${entry.level || ''}</span>
+        <span>${entry.section || ''}</span>
+      </div>
+      <div class="mt-1">${entry.msg || ''}</div>
+      <pre class="mt-2 text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded overflow-x-auto">${JSON.stringify(entry, null, 2)}</pre>
+    `;
+    container.appendChild(div);
+  }
+
+  source.onmessage = (event) => {
+    const entry = JSON.parse(event.data);
+    allLogs.push(entry);
+    if (matchesFilters(entry)) renderLogs();
+  };
+
+  levelFilter.onchange = renderLogs;
+  sectionFilter.oninput = renderLogs;
+  clearBtn.onclick = () => {
+    levelFilter.value = "";
+    sectionFilter.value = "";
+    renderLogs();
+  };
+  </script>
+</body>
+</html>
