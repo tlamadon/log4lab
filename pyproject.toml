@@ -12,5 +12,19 @@ dependencies = [
     "typer"
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=7.0",
+    "pytest-asyncio>=0.21",
+    "httpx>=0.24"
+]
+
 [project.scripts]
 logboard = "logboard.cli:app"
+
+[tool.setuptools]
+packages = ["logboard"]
+
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
