@@ -3,10 +3,10 @@ import uvicorn
 from pathlib import Path
 from . import server
 
-cli = typer.Typer(help="LogBoard — a lightweight structured log dashboard")
+app = typer.Typer(help="LogBoard — a lightweight structured log dashboard")
 
 
-@cli.command()
+@app.command()
 def serve(
     logfile: Path = typer.Argument(
         "logs/app.log",
@@ -18,10 +18,10 @@ def serve(
     reload: bool = typer.Option(False, help="Enable auto-reload"),
 ):
     """Start the LogBoard web server."""
-    server.LOG_PATH = logfile
+    server.set_log_path(logfile)
     uvicorn.run("logboard.server:app", host=host, port=port, reload=reload)
 
 
 if __name__ == "__main__":
-    cli()
+    app()
 

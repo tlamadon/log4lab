@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="en" class="dark:bg-gray-900 dark:text-gray-100">
+<head>
+  <meta charset="UTF-8">
+  <title>LogBoard — Run IDs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    if (localStorage.theme === 'dark' ||
+        (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 transition-colors">
+  <div class="max-w-6xl mx-auto p-6">
+    <div class="flex justify-between items-center mb-6">
+      <h1 class="text-3xl font-bold">LogBoard <span class="text-sm font-light">(Runs Index)</span></h1>
+      <div class="flex space-x-2">
+        <a href="/" class="px-3 py-1 rounded border text-sm bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700">
+          📊 View Logs
+        </a>
+        <button id="themeToggle"
+          class="px-3 py-1 rounded border text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
+          Toggle Theme
+        </button>
+      </div>
+    </div>
+
+    <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+      <p class="text-sm text-blue-800 dark:text-blue-200">
+        Click on a run name to view all runs, or click on a specific run ID to view that run's logs.
+      </p>
+    </div>
+
+    <div id="loading" class="text-center py-8">
+      <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900 dark:border-gray-100"></div>
+      <p class="mt-2 text-gray-600 dark:text-gray-400">Loading runs...</p>
+    </div>
+
+    <div id="run-container" class="hidden">
+      <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
+        Found <span id="run-count" class="font-semibold">0</span> unique run names
+      </div>
+
+      <div id="run-list" class="space-y-4"></div>
+    </div>
+
+    <div id="no-runs" class="hidden text-center py-8 text-gray-600 dark:text-gray-400">
+      <p>No runs found in the log file.</p>
+      <p class="text-sm mt-2">Runs are identified by the "run_name" and "run_id" fields in log entries.</p>
+    </div>
+  </div>
+
+  <script>
+  const themeToggle = document.getElementById("themeToggle");
+  const loading = document.getElementById("loading");
+  const runContainer = document.getElementById("run-container");
+  const noRuns = document.getElementById("no-runs");
+  const runList = document.getElementById("run-list");
+  const runCount = document.getElementById("run-count");
+
+  themeToggle.onclick = () => {
+    const html = document.documentElement;
+    if (html.classList.contains('dark')) {
+      html.classList.remove('dark');
+      localStorage.theme = 'light';
+    } else {
+      html.classList.add('dark');
+      localStorage.theme = 'dark';
+    }
+  };
+
+  // Fetch runs from server
+  fetch('/api/runs')
+    .then(response => response.json())
+    .then(data => {
+      loading.classList.add('hidden');
+
+      if (data.runs && Object.keys(data.runs).length > 0) {
+        runContainer.classList.remove('hidden');
+        runCount.textContent = Object.keys(data.runs).length;
+
+        Object.keys(data.runs).sort().forEach(runName => {
+          const runData = data.runs[runName];
+          const totalLogs = runData.total;
+          const runIds = runData.run_ids;
+
+          const div = document.createElement('div');
+          div.className = 'p-4 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 rounded';
+
+          div.innerHTML = `
+            <div class="flex justify-between items-center mb-3">
+              <div class="flex-1">
+                <a href="/?run_name=${encodeURIComponent(runName)}"
+                   class="text-xl font-semibold text-blue-600 dark:text-blue-400 hover:underline">
+                  ${runName}
+                </a>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
+                  ${totalLogs} log ${totalLogs === 1 ? 'entry' : 'entries'} across ${runIds.length} run${runIds.length === 1 ? '' : 's'}
+                </p>
+              </div>
+              <div>
+                <a href="/?run_name=${encodeURIComponent(runName)}"
+                   class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">
+                  View All →
+                </a>
+              </div>
+            </div>
+            <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
+              <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">INDIVIDUAL RUNS:</p>
+              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                ${runIds.map(runIdInfo => `
+                  <a href="/?run_id=${encodeURIComponent(runIdInfo.run_id)}"
+                     class="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-sm border border-gray-300 dark:border-gray-600 transition">
+                    <div class="font-mono font-semibold text-gray-800 dark:text-gray-200">${runIdInfo.run_id}</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-400">${runIdInfo.count} ${runIdInfo.count === 1 ? 'entry' : 'entries'}</div>
+                  </a>
+                `).join('')}
+              </div>
+            </div>
+          `;
+
+          runList.appendChild(div);
+        });
+      } else {
+        noRuns.classList.remove('hidden');
+      }
+    })
+    .catch(error => {
+      loading.classList.add('hidden');
+      noRuns.classList.remove('hidden');
+      console.error('Error fetching runs:', error);
+    });
+  </script>
+</body>
+</html>

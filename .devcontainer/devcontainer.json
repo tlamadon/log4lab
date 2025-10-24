@@ -1,0 +1,44 @@
+{
+  "name": "LogBoard Development",
+  "image": "mcr.microsoft.com/devcontainers/python:3.11",
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "ms-python.black-formatter",
+        "charliermarsh.ruff",
+        "redhat.vscode-yaml",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.linting.enabled": true,
+        "python.linting.pylintEnabled": false,
+        "python.formatting.provider": "none",
+        "[python]": {
+          "editor.defaultFormatter": "ms-python.black-formatter",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.organizeImports": "explicit"
+          }
+        },
+        "python.testing.pytestEnabled": false,
+        "python.testing.unittestEnabled": false
+      }
+    }
+  },
+  "forwardPorts": [8000],
+  "portsAttributes": {
+    "8000": {
+      "label": "LogBoard Server",
+      "onAutoForward": "notify"
+    }
+  },
+  "postCreateCommand": "pip install -e .",
+  "remoteUser": "vscode",
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {}
+  }
+}

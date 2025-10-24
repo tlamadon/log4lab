@@ -1,1 +1,4 @@
 logboard/__pycache__/
+.venv/
+logboard.egg-info/
+logs/

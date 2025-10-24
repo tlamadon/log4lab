@@ -17,20 +17,22 @@
   <div class="max-w-6xl mx-auto p-6">
     <div class="flex justify-between items-center mb-4">
       <h1 class="text-3xl font-bold">LogBoard <span class="text-sm font-light">(Live)</span></h1>
-      <button id="themeToggle"
-        class="px-3 py-1 rounded border text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
-        Toggle Theme
-      </button>
+      <div class="flex space-x-2">
+        <a href="/runs" class="px-3 py-1 rounded border text-sm bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700">
+          📋 Runs Index
+        </a>
+        <button id="themeToggle"
+          class="px-3 py-1 rounded border text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
+          Toggle Theme
+        </button>
+      </div>
     </div>
 
-    <div class="flex space-x-4 mb-4 items-center">
+    <div class="flex space-x-4 mb-4 items-center flex-wrap">
       <div>
         <label class="block text-sm font-medium">Level</label>
         <select id="levelFilter" class="border rounded px-2 py-1 dark:bg-gray-800 dark:border-gray-700">
           <option value="">All</option>
-          <option value="INFO">INFO</option>
-          <option value="WARN">WARN</option>
-          <option value="ERROR">ERROR</option>
         </select>
       </div>
 
@@ -41,13 +43,79 @@
                placeholder="e.g. train" />
       </div>
 
+      <div>
+        <label class="block text-sm font-medium">Group</label>
+        <input id="groupFilter" type="text"
+               class="border rounded px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+               placeholder="e.g. experiment1" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Run Name</label>
+        <input id="runNameFilter" type="text"
+               class="border rounded px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+               placeholder="e.g. my_experiment" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Run ID</label>
+        <input id="runIdFilter" type="text"
+               class="border rounded px-2 py-1 dark:bg-gray-800 dark:border-gray-700"
+               placeholder="e.g. abc123" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium">Time Range</label>
+        <select id="timeFilter" class="border rounded px-2 py-1 dark:bg-gray-800 dark:border-gray-700">
+          <option value="">All Time</option>
+          <option value="60">Last 1 minute</option>
+          <option value="300">Last 5 minutes</option>
+          <option value="600">Last 10 minutes</option>
+          <option value="1800">Last 30 minutes</option>
+          <option value="3600">Last 1 hour</option>
+          <option value="21600">Last 6 hours</option>
+          <option value="86400">Last 24 hours</option>
+        </select>
+      </div>
+
       <button id="clearFilters"
-        class="bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 px-3 py-1 rounded">
+        class="bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700 px-3 py-1 rounded mt-5">
         Clear
+      </button>
+
+      <button id="sortToggle"
+        class="bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 px-3 py-1 rounded mt-5 text-sm">
+        ⬆️ Oldest First
       </button>
     </div>
 
     <div id="log-container" class="space-y-2"></div>
+
+    <div id="pagination" class="mt-6 flex items-center justify-between border-t border-gray-300 dark:border-gray-700 pt-4">
+      <div class="text-sm text-gray-600 dark:text-gray-400">
+        Showing <span id="showing-start">0</span>-<span id="showing-end">0</span> of <span id="total-count">0</span> logs
+      </div>
+      <div class="flex items-center space-x-2">
+        <label class="text-sm text-gray-600 dark:text-gray-400">Per page:</label>
+        <select id="perPageSelect" class="border rounded px-2 py-1 text-sm dark:bg-gray-800 dark:border-gray-700">
+          <option value="20">20</option>
+          <option value="50" selected>50</option>
+          <option value="100">100</option>
+          <option value="200">200</option>
+        </select>
+      </div>
+      <div class="flex space-x-2">
+        <button id="prevPage" class="px-3 py-1 border rounded text-sm bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          Previous
+        </button>
+        <span class="px-3 py-1 text-sm text-gray-600 dark:text-gray-400">
+          Page <span id="currentPage">1</span> of <span id="totalPages">1</span>
+        </span>
+        <button id="nextPage" class="px-3 py-1 border rounded text-sm bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 disabled:opacity-50 disabled:cursor-not-allowed" disabled>
+          Next
+        </button>
+      </div>
+    </div>
   </div>
 
   <script>
@@ -55,9 +123,56 @@
   const source = new EventSource("/stream");
   const levelFilter = document.getElementById("levelFilter");
   const sectionFilter = document.getElementById("sectionFilter");
+  const groupFilter = document.getElementById("groupFilter");
+  const runNameFilter = document.getElementById("runNameFilter");
+  const runIdFilter = document.getElementById("runIdFilter");
+  const timeFilter = document.getElementById("timeFilter");
   const clearBtn = document.getElementById("clearFilters");
   const themeToggle = document.getElementById("themeToggle");
+  const sortToggle = document.getElementById("sortToggle");
+
+  // Pagination elements
+  const perPageSelect = document.getElementById("perPageSelect");
+  const prevPageBtn = document.getElementById("prevPage");
+  const nextPageBtn = document.getElementById("nextPage");
+  const currentPageSpan = document.getElementById("currentPage");
+  const totalPagesSpan = document.getElementById("totalPages");
+  const showingStartSpan = document.getElementById("showing-start");
+  const showingEndSpan = document.getElementById("showing-end");
+  const totalCountSpan = document.getElementById("total-count");
+
   let allLogs = [];
+  let knownLevels = new Set();
+  let currentPage = 1;
+  let perPage = 50;
+  let sortOldestFirst = false;
+
+  // Parse URL parameters
+  function getUrlParams() {
+    const params = new URLSearchParams(window.location.search);
+    return {
+      level: params.get('level') || '',
+      section: params.get('section') || '',
+      group: params.get('group') || '',
+      run_name: params.get('run_name') || '',
+      run_id: params.get('run_id') || '',
+      time: params.get('time') || ''
+    };
+  }
+
+  // Apply URL parameters to filters
+  function applyUrlParams() {
+    const params = getUrlParams();
+    if (params.level) levelFilter.value = params.level;
+    if (params.section) sectionFilter.value = params.section;
+    if (params.group) groupFilter.value = params.group;
+    if (params.run_name) runNameFilter.value = params.run_name;
+    if (params.run_id) runIdFilter.value = params.run_id;
+    if (params.time) timeFilter.value = params.time;
+  }
+
+  // Apply filters from URL on page load
+  applyUrlParams();
 
   themeToggle.onclick = () => {
     const html = document.documentElement;
@@ -71,52 +186,392 @@
   };
 
   function matchesFilters(entry) {
-    const level = levelFilter.value;
+    const level = levelFilter.value.toLowerCase();
     const section = sectionFilter.value.toLowerCase();
-    if (level && entry.level !== level) return false;
+    const group = groupFilter.value.toLowerCase();
+    const runName = runNameFilter.value.toLowerCase();
+    const runId = runIdFilter.value.toLowerCase();
+    const timeRange = parseInt(timeFilter.value);
+
+    if (level && (!entry.level || entry.level.toLowerCase() !== level)) return false;
     if (section && (!entry.section || !entry.section.toLowerCase().includes(section))) return false;
+    if (group && (!entry.group || !entry.group.toLowerCase().includes(group))) return false;
+    if (runName && (!entry.run_name || !entry.run_name.toLowerCase().includes(runName))) return false;
+    if (runId && (!entry.run_id || !entry.run_id.toLowerCase().includes(runId))) return false;
+
+    // Time range filter
+    if (timeRange && entry.time) {
+      const logTime = new Date(entry.time);
+      const now = new Date();
+      const diffSeconds = (now - logTime) / 1000;
+      if (diffSeconds > timeRange) return false;
+    }
+
     return true;
+  }
+
+  function updateLevelFilter() {
+    const currentSelection = levelFilter.value;
+    const sortedLevels = Array.from(knownLevels).sort();
+
+    // Keep "All" option and rebuild the rest
+    levelFilter.innerHTML = '<option value="">All</option>';
+    sortedLevels.forEach(level => {
+      const option = document.createElement('option');
+      option.value = level.toLowerCase();
+      option.textContent = level;
+      levelFilter.appendChild(option);
+    });
+
+    // Restore previous selection if it still exists
+    if (currentSelection) {
+      levelFilter.value = currentSelection;
+    }
+  }
+
+  function updatePaginationInfo(filteredLogs) {
+    const totalLogs = filteredLogs.length;
+    const totalPages = Math.max(1, Math.ceil(totalLogs / perPage));
+
+    // Ensure current page is within bounds
+    if (currentPage > totalPages) {
+      currentPage = totalPages;
+    }
+    if (currentPage < 1) {
+      currentPage = 1;
+    }
+
+    const startIdx = (currentPage - 1) * perPage;
+    const endIdx = Math.min(startIdx + perPage, totalLogs);
+
+    // Update pagination display
+    currentPageSpan.textContent = currentPage;
+    totalPagesSpan.textContent = totalPages;
+    showingStartSpan.textContent = totalLogs > 0 ? startIdx + 1 : 0;
+    showingEndSpan.textContent = endIdx;
+    totalCountSpan.textContent = totalLogs;
+
+    // Update button states
+    prevPageBtn.disabled = currentPage <= 1;
+    nextPageBtn.disabled = currentPage >= totalPages;
   }
 
   function renderLogs() {
     container.innerHTML = "";
-    allLogs
-      .filter(matchesFilters)
-      .slice(-200)
-      .reverse()
-      .forEach(renderLog);
+
+    const filteredLogs = allLogs.filter(matchesFilters);
+    // Sort based on toggle: newest first (default) or oldest first
+    const sortedLogs = sortOldestFirst ? filteredLogs.slice() : filteredLogs.slice().reverse();
+
+    // Calculate pagination
+    const startIdx = (currentPage - 1) * perPage;
+    const endIdx = startIdx + perPage;
+    const pageLog = sortedLogs.slice(startIdx, endIdx);
+
+    // Render logs for current page
+    pageLog.forEach(renderLog);
+
+    // Update pagination info
+    updatePaginationInfo(filteredLogs);
+  }
+
+  function getTimeAgo(timestamp) {
+    if (!timestamp) return '';
+
+    // Parse timestamp - if it doesn't end with Z and looks like UTC, add Z
+    let ts = timestamp;
+    if (!ts.endsWith('Z') && !ts.includes('+') && !ts.includes('-', 10)) {
+      // Looks like an ISO timestamp without timezone - treat as UTC
+      ts = ts + 'Z';
+    }
+
+    const logTime = new Date(ts);
+    const now = new Date();
+    const diffMs = now - logTime;
+    const diffSec = Math.floor(diffMs / 1000);
+    const diffMin = Math.floor(diffSec / 60);
+    const diffHour = Math.floor(diffMin / 60);
+    const diffDay = Math.floor(diffHour / 24);
+
+    // Handle future timestamps
+    if (diffSec < 0) {
+      const absSec = Math.abs(diffSec);
+      if (absSec < 60) return `in ${absSec}s`;
+      const absMin = Math.floor(absSec / 60);
+      if (absMin < 60) return `in ${absMin}m`;
+      const absHour = Math.floor(absMin / 60);
+      return `in ${absHour}h`;
+    }
+
+    if (diffSec < 10) return 'just now';
+    if (diffSec < 60) return `${diffSec}s ago`;
+    if (diffMin < 60) return `${diffMin}m ago`;
+    if (diffHour < 24) return `${diffHour}h ago`;
+    return `${diffDay}d ago`;
+  }
+
+  function renderRunInfo(entry) {
+    if (!entry.run_name && !entry.run_id) return '';
+
+    const parts = [];
+    if (entry.run_name) parts.push(`run: <span class="font-semibold">${entry.run_name}</span>`);
+    if (entry.run_id) parts.push(`id: <span class="font-semibold">${entry.run_id}</span>`);
+
+    let url = '/runs';
+    if (entry.run_id) {
+      url = `/?run_id=${encodeURIComponent(entry.run_id)}`;
+    } else if (entry.run_name) {
+      url = `/?run_name=${encodeURIComponent(entry.run_name)}`;
+    }
+
+    return `<a href="${url}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline ml-2">🔗 ${parts.join(', ')}</a>`;
+  }
+
+  function renderCachePath(cachePath) {
+    if (!cachePath) return '';
+
+    const ext = cachePath.split('.').pop().toLowerCase();
+    const cacheUrl = `/cache/${encodeURIComponent(cachePath)}`;
+
+    // Check if it's an image
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {
+      return `<div class="mt-2">
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cached Artifact:</div>
+        <img src="${cacheUrl}" alt="Cached artifact" class="max-w-full h-auto rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+             onclick="window.open('${cacheUrl}', '_blank')"
+             style="max-height: 400px; object-fit: contain;" />
+      </div>`;
+    }
+
+    // Check if it's a PDF
+    if (ext === 'pdf') {
+      return `<div class="mt-2">
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cached Artifact (PDF):</div>
+        <embed src="${cacheUrl}" type="application/pdf" class="w-full rounded border border-gray-300 dark:border-gray-600" style="height: 400px;" />
+        <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Open PDF in new tab</a>
+      </div>`;
+    }
+
+    // For other file types, just show a link
+    return `<div class="mt-2">
+      <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cached Artifact:</div>
+      <a href="${cacheUrl}" target="_blank" class="text-sm text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
+        📎 ${cachePath}
+      </a>
+    </div>`;
   }
 
   function renderLog(entry) {
     const div = document.createElement("div");
+    const levelLower = (entry.level || '').toLowerCase();
     const border =
-      entry.level === "ERROR" ? "border-red-500" :
-      entry.level === "WARN" ? "border-yellow-400" :
+      levelLower === "error" ? "border-red-500" :
+      levelLower === "warn" || levelLower === "warning" ? "border-yellow-400" :
+      levelLower === "debug" ? "border-gray-400" :
       "border-blue-400";
     div.className = `p-3 bg-white dark:bg-gray-800 border-l-4 ${border} rounded shadow-sm transition`;
+
+    const timeAgo = getTimeAgo(entry.time);
+    const timeDisplay = entry.time ? `<span class="time-ago font-medium text-gray-700 dark:text-gray-200" data-timestamp="${entry.time}">${timeAgo}</span>` : '';
+
+    const cachePathHtml = renderCachePath(entry.cache_path);
+    const runInfoHtml = renderRunInfo(entry);
+
+    // Use 'message' field for HTML content, fallback to 'msg'
+    const mainContent = entry.message || entry.msg || '';
+
+    // Generate unique ID for collapse functionality
+    const uniqueId = `json-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     div.innerHTML = `
       <div class="flex justify-between text-sm text-gray-600 dark:text-gray-300">
-        <span>${entry.time || ''}</span>
-        <span class="font-semibold">${entry.level || ''}</span>
-        <span>${entry.section || ''}</span>
+        <div class="flex items-center space-x-2">
+          ${timeDisplay}
+          <span class="text-xs">${entry.time || ''}</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="font-semibold">${entry.level || ''}</span>
+          <span>${entry.section || ''}</span>
+          ${runInfoHtml}
+        </div>
       </div>
-      <div class="mt-1">${entry.msg || ''}</div>
-      <pre class="mt-2 text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded overflow-x-auto">${JSON.stringify(entry, null, 2)}</pre>
+      <div class="mt-2 text-gray-900 dark:text-gray-100 font-mono text-sm whitespace-pre-wrap">${mainContent}</div>
+      ${cachePathHtml}
+      <div class="mt-2">
+        <button onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.arrow').style.transform = this.nextElementSibling.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(90deg)'; this.querySelector('.btn-text').textContent = this.nextElementSibling.classList.contains('hidden') ? 'Show JSON' : 'Hide JSON';"
+                class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1">
+          <span class="arrow transform transition-transform" style="transform: rotate(0deg)">▶</span>
+          <span class="btn-text">Show JSON</span>
+        </button>
+        <pre class="hidden mt-1 text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded overflow-x-auto">${JSON.stringify(entry, null, 2)}</pre>
+      </div>
     `;
+
     container.appendChild(div);
+  }
+
+  function prependLog(entry) {
+    const div = document.createElement("div");
+    const levelLower = (entry.level || '').toLowerCase();
+    const border =
+      levelLower === "error" ? "border-red-500" :
+      levelLower === "warn" || levelLower === "warning" ? "border-yellow-400" :
+      levelLower === "debug" ? "border-gray-400" :
+      "border-blue-400";
+    div.className = `p-3 bg-white dark:bg-gray-800 border-l-4 ${border} rounded shadow-sm transition`;
+
+    const timeAgo = getTimeAgo(entry.time);
+    const timeDisplay = entry.time ? `<span class="time-ago font-medium text-gray-700 dark:text-gray-200" data-timestamp="${entry.time}">${timeAgo}</span>` : '';
+
+    const cachePathHtml = renderCachePath(entry.cache_path);
+    const runInfoHtml = renderRunInfo(entry);
+    const mainContent = entry.message || entry.msg || '';
+
+    div.innerHTML = `
+      <div class="flex justify-between text-sm text-gray-600 dark:text-gray-300">
+        <div class="flex items-center space-x-2">
+          ${timeDisplay}
+          <span class="text-xs">${entry.time || ''}</span>
+        </div>
+        <div class="flex items-center space-x-2">
+          <span class="font-semibold">${entry.level || ''}</span>
+          <span>${entry.section || ''}</span>
+          ${runInfoHtml}
+        </div>
+      </div>
+      <div class="mt-2 text-gray-900 dark:text-gray-100 font-mono text-sm whitespace-pre-wrap">${mainContent}</div>
+      ${cachePathHtml}
+      <div class="mt-2">
+        <button onclick="this.nextElementSibling.classList.toggle('hidden'); this.querySelector('.arrow').style.transform = this.nextElementSibling.classList.contains('hidden') ? 'rotate(0deg)' : 'rotate(90deg)'; this.querySelector('.btn-text').textContent = this.nextElementSibling.classList.contains('hidden') ? 'Show JSON' : 'Hide JSON';"
+                class="text-xs text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 flex items-center gap-1">
+          <span class="arrow transform transition-transform" style="transform: rotate(0deg)">▶</span>
+          <span class="btn-text">Show JSON</span>
+        </button>
+        <pre class="hidden mt-1 text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded overflow-x-auto">${JSON.stringify(entry, null, 2)}</pre>
+      </div>
+    `;
+
+    container.insertBefore(div, container.firstChild);
   }
 
   source.onmessage = (event) => {
     const entry = JSON.parse(event.data);
     allLogs.push(entry);
-    if (matchesFilters(entry)) renderLogs();
+
+    // Track new log levels and update filter dropdown
+    if (entry.level && !knownLevels.has(entry.level)) {
+      knownLevels.add(entry.level);
+      updateLevelFilter();
+    }
+
+    // With pagination, we need to re-render when new entries arrive
+    // if we're on page 1 (to show newest entries) or if filters are active
+    if (matchesFilters(entry)) {
+      const hasActiveFilters = levelFilter.value || sectionFilter.value || groupFilter.value || runNameFilter.value || runIdFilter.value || timeFilter.value;
+
+      if (currentPage === 1 && !hasActiveFilters) {
+        // On page 1 with no filters, we can optimize by prepending
+        const filteredCount = allLogs.filter(matchesFilters).length;
+        if (filteredCount <= perPage) {
+          prependLog(entry);
+          updatePaginationInfo(allLogs.filter(matchesFilters));
+        } else {
+          renderLogs();
+        }
+      } else {
+        // Otherwise re-render to maintain pagination integrity
+        renderLogs();
+      }
+    }
   };
 
-  levelFilter.onchange = renderLogs;
-  sectionFilter.oninput = renderLogs;
+  // Function to update all time-ago displays
+  function updateTimeDisplays() {
+    document.querySelectorAll('.time-ago').forEach(element => {
+      const timestamp = element.getAttribute('data-timestamp');
+      if (timestamp) {
+        element.textContent = getTimeAgo(timestamp);
+      }
+    });
+  }
+
+  // Update time displays every 5 seconds for better responsiveness
+  setInterval(updateTimeDisplays, 5000);
+
+  // Initial render when page loads
+  renderLogs();
+
+  // Re-render logs every minute if time filter is active (to hide old entries)
+  setInterval(() => {
+    if (timeFilter.value) {
+      renderLogs();
+    }
+  }, 60000);
+
+  levelFilter.onchange = () => {
+    currentPage = 1; // Reset to page 1 when filters change
+    renderLogs();
+  };
+  sectionFilter.oninput = () => {
+    currentPage = 1;
+    renderLogs();
+  };
+  groupFilter.oninput = () => {
+    currentPage = 1;
+    renderLogs();
+  };
+  runNameFilter.oninput = () => {
+    currentPage = 1;
+    renderLogs();
+  };
+  runIdFilter.oninput = () => {
+    currentPage = 1;
+    renderLogs();
+  };
+  timeFilter.onchange = () => {
+    currentPage = 1;
+    renderLogs();
+  };
   clearBtn.onclick = () => {
     levelFilter.value = "";
     sectionFilter.value = "";
+    groupFilter.value = "";
+    runNameFilter.value = "";
+    runIdFilter.value = "";
+    timeFilter.value = "";
+    currentPage = 1;
+    renderLogs();
+  };
+
+  // Pagination controls
+  prevPageBtn.onclick = () => {
+    if (currentPage > 1) {
+      currentPage--;
+      renderLogs();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  nextPageBtn.onclick = () => {
+    const totalPages = Math.ceil(allLogs.filter(matchesFilters).length / perPage);
+    if (currentPage < totalPages) {
+      currentPage++;
+      renderLogs();
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  perPageSelect.onchange = () => {
+    perPage = parseInt(perPageSelect.value);
+    currentPage = 1; // Reset to page 1 when changing per page
+    renderLogs();
+  };
+
+  // Sort toggle
+  sortToggle.onclick = () => {
+    sortOldestFirst = !sortOldestFirst;
+    sortToggle.textContent = sortOldestFirst ? '⬇️ Newest First' : '⬆️ Oldest First';
+    currentPage = 1; // Reset to page 1 when changing sort
     renderLogs();
   };
   </script>
