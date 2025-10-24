@@ -36,7 +36,7 @@ async def show_runs_page():
 async def get_runs():
     """Get run_names with their run_ids from the log file."""
     log_path = get_log_path()
-    runs = {}  # {run_name: {run_ids: [{run_id, count}], total: X}}
+    runs = {}  # {run_name: {run_ids: {run_id: {count, earliest, latest}}, total: X}}
 
     if log_path.exists():
         with log_path.open() as f:
@@ -48,6 +48,7 @@ async def get_runs():
                     obj = json.loads(line)
                     run_name = obj.get('run_name')
                     run_id = obj.get('run_id')
+                    timestamp = obj.get('time')
 
                     if run_name:
                         run_name = str(run_name)
@@ -59,8 +60,23 @@ async def get_runs():
                         if run_id:
                             run_id = str(run_id)
                             if run_id not in runs[run_name]['run_ids']:
-                                runs[run_name]['run_ids'][run_id] = 0
-                            runs[run_name]['run_ids'][run_id] += 1
+                                runs[run_name]['run_ids'][run_id] = {
+                                    'count': 0,
+                                    'earliest': None,
+                                    'latest': None
+                                }
+                            runs[run_name]['run_ids'][run_id]['count'] += 1
+
+                            # Track earliest and latest timestamps
+                            if timestamp:
+                                if runs[run_name]['run_ids'][run_id]['earliest'] is None:
+                                    runs[run_name]['run_ids'][run_id]['earliest'] = timestamp
+                                    runs[run_name]['run_ids'][run_id]['latest'] = timestamp
+                                else:
+                                    if timestamp < runs[run_name]['run_ids'][run_id]['earliest']:
+                                        runs[run_name]['run_ids'][run_id]['earliest'] = timestamp
+                                    if timestamp > runs[run_name]['run_ids'][run_id]['latest']:
+                                        runs[run_name]['run_ids'][run_id]['latest'] = timestamp
 
                 except json.JSONDecodeError:
                     continue
@@ -71,8 +87,13 @@ async def get_runs():
         result[run_name] = {
             'total': data['total'],
             'run_ids': [
-                {'run_id': rid, 'count': count}
-                for rid, count in sorted(data['run_ids'].items())
+                {
+                    'run_id': rid,
+                    'count': info['count'],
+                    'earliest': info['earliest'],
+                    'latest': info['latest']
+                }
+                for rid, info in sorted(data['run_ids'].items())
             ]
         }
 

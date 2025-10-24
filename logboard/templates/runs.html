@@ -72,6 +72,46 @@
     }
   };
 
+  // Helper function to format date and calculate duration
+  function formatRunInfo(earliest, latest) {
+    if (!earliest) {
+      return { date: 'N/A', duration: 'N/A' };
+    }
+
+    // Handle timestamp with or without 'Z'
+    let ts = earliest;
+    if (!ts.endsWith('Z') && !ts.includes('+') && !ts.includes('-', 10)) {
+      ts = ts + 'Z';
+    }
+
+    const startDate = new Date(ts);
+    const dateStr = startDate.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    if (!latest || earliest === latest) {
+      return { date: dateStr, duration: '0h' };
+    }
+
+    // Calculate duration in hours
+    let tsLatest = latest;
+    if (!tsLatest.endsWith('Z') && !tsLatest.includes('+') && !tsLatest.includes('-', 10)) {
+      tsLatest = tsLatest + 'Z';
+    }
+    const endDate = new Date(tsLatest);
+    const durationMs = endDate - startDate;
+    const durationHours = Math.round(durationMs / (1000 * 60 * 60) * 10) / 10; // Round to 1 decimal
+
+    return {
+      date: dateStr,
+      duration: durationHours >= 1 ? `${durationHours}h` : `${Math.round(durationMs / (1000 * 60))}m`
+    };
+  }
+
   // Fetch runs from server
   fetch('/api/runs')
     .then(response => response.json())
@@ -111,13 +151,17 @@
             <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
               <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">INDIVIDUAL RUNS:</p>
               <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                ${runIds.map(runIdInfo => `
+                ${runIds.map(runIdInfo => {
+                  const info = formatRunInfo(runIdInfo.earliest, runIdInfo.latest);
+                  return `
                   <a href="/?run_id=${encodeURIComponent(runIdInfo.run_id)}"
                      class="px-3 py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded text-sm border border-gray-300 dark:border-gray-600 transition">
-                    <div class="font-mono font-semibold text-gray-800 dark:text-gray-200">${runIdInfo.run_id}</div>
-                    <div class="text-xs text-gray-600 dark:text-gray-400">${runIdInfo.count} ${runIdInfo.count === 1 ? 'entry' : 'entries'}</div>
+                    <div class="text-xs font-semibold text-gray-600 dark:text-gray-300">${info.date}</div>
+                    <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
+                      Duration: ${info.duration} • ${runIdInfo.count} ${runIdInfo.count === 1 ? 'entry' : 'entries'}
+                    </div>
                   </a>
-                `).join('')}
+                `}).join('')}
               </div>
             </div>
           `;
