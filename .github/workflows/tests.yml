@@ -33,4 +33,4 @@ jobs:
 
     - name: Test installation
       run: |
-        logboard --help
+        log4lab --help
