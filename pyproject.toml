@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A lightweight structured log viewer with live streaming and filters."
 authors = [{ name = "Thibaut Lamadon" }]
 readme = "README.md"
-license = "MIT"
+license = {file = "LICENSE"}
 requires-python = ">=3.8"
 keywords = [
     "logging",
