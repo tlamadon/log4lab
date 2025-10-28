@@ -66,12 +66,25 @@ Or tail logs in the terminal:
 log4lab tail [LOGFILE]
 ```
 
+Or export logs to a standalone HTML file:
+
+```bash
+log4lab export [LOGFILE] -o output.html
+```
+
 ### Options
 
+#### Serve Command
 - `LOGFILE`: Path to the JSONL log file to stream (default: `logs/app.log`)
 - `--host`: Host to bind to (default: `127.0.0.1`)
 - `--port`: Port to listen on (default: `8000`)
 - `--reload`: Enable auto-reload for development
+
+#### Export Command
+- `LOGFILE`: Path to the JSONL log file to export (default: `logs/app.log`)
+- `--output`, `-o`: Output HTML file path (default: `logs-export.html`)
+- `--title`, `-t`: Custom title for the HTML page (default: `Log4Lab Export`)
+- `--no-embed-images`: Skip embedding images as base64 (reduces file size)
 
 ### Examples
 
@@ -96,6 +109,15 @@ log4lab tail myapp.log
 
 # Tail with filters
 log4lab tail myapp.log --level=ERROR --open-images
+
+# Export to standalone HTML file
+log4lab export myapp.log -o my-logs.html
+
+# Export with custom title
+log4lab export myapp.log -o report.html --title "Experiment Results"
+
+# Export without embedding images (smaller file size)
+log4lab export myapp.log -o lightweight.html --no-embed-images
 ```
 
 Then open your browser to `http://localhost:8000` to view the dashboard.
@@ -243,6 +265,26 @@ If your logs include a `cache_path` field pointing to artifacts:
 ### Theme Support
 
 Toggle between light and dark modes with the theme button in the top-right corner. Your preference is saved in browser local storage and persists across sessions.
+
+### Export to Standalone HTML
+
+Generate a completely self-contained HTML file with all your logs and embedded images that can be:
+- **Downloaded and shared**: Single file contains everything - no server needed
+- **Opened offline**: Works in any browser without internet connection
+- **Archived**: Perfect for preserving experiment results and incident reports
+- **Fully interactive**: All filters, pagination, and sorting features work exactly like the live dashboard
+
+The export embeds:
+- All log entries as inline JSON data
+- Images and artifacts as base64 data URLs (optional)
+- Complete CSS and JavaScript (using Tailwind CDN)
+- All filtering and pagination functionality
+
+**Example use cases:**
+- Archive experiment results for papers or reports
+- Share debugging sessions with team members
+- Create portable incident reports
+- Preserve historical logs for compliance
 
 ## Use Cases
 

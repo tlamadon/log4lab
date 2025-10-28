@@ -4,6 +4,7 @@ from pathlib import Path
 from typing import Optional
 from . import server
 from .tail import LogTailer
+from .export import export_logs_to_html
 
 app = typer.Typer(help="Log4Lab — a lightweight structured log dashboard")
 
@@ -57,6 +58,55 @@ def tail(
         tailer.tail()
     except KeyboardInterrupt:
         pass  # Clean exit on Ctrl+C
+
+
+@app.command()
+def export(
+    logfile: Path = typer.Argument(
+        "logs/app.log",
+        help="Path to the JSONL log file to export"
+    ),
+    output: Path = typer.Option(
+        "logs-export.html",
+        "--output", "-o",
+        help="Output HTML file path"
+    ),
+    title: str = typer.Option(
+        "Log4Lab Export",
+        "--title", "-t",
+        help="Title for the HTML page"
+    ),
+    no_embed_images: bool = typer.Option(
+        False,
+        "--no-embed-images",
+        help="Don't embed images as base64 (reduces file size but images won't be included)"
+    ),
+):
+    """Export logs to a self-contained HTML file with embedded images and working filters."""
+    if not logfile.exists():
+        typer.echo(f"Error: Log file '{logfile}' does not exist.", err=True)
+        raise typer.Exit(1)
+
+    typer.echo(f"Exporting logs from '{logfile}' to '{output}'...")
+
+    try:
+        export_logs_to_html(
+            log_path=logfile,
+            output_path=output,
+            title=title,
+            embed_images=not no_embed_images
+        )
+
+        file_size = output.stat().st_size
+        size_mb = file_size / (1024 * 1024)
+
+        typer.echo(f"✓ Export complete! File size: {size_mb:.2f} MB")
+        typer.echo(f"✓ Saved to: {output.absolute()}")
+        typer.echo(f"\nOpen the file in your browser to view the logs with working filters.")
+
+    except Exception as e:
+        typer.echo(f"Error during export: {e}", err=True)
+        raise typer.Exit(1)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,30 @@ version = "0.1.0"
 description = "A lightweight structured log viewer with live streaming and filters."
 authors = [{ name = "Thibaut Lamadon" }]
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.8"
+keywords = [
+    "logging",
+    "log-viewer",
+    "structured-logs",
+    "jsonl",
+    "monitoring",
+    "dashboard",
+    "live-streaming"
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: System :: Logging",
+    "Topic :: System :: Monitoring",
+]
 dependencies = [
     "fastapi",
     "uvicorn",
@@ -12,6 +35,11 @@ dependencies = [
     "typer",
     "rich>=13.0.0"
 ]
+
+[project.urls]
+Homepage = "https://github.com/tlamadon/log4lab"
+Repository = "https://github.com/tlamadon/log4lab"
+Issues = "https://github.com/tlamadon/log4lab/issues"
 
 [project.optional-dependencies]
 test = [
@@ -27,7 +55,10 @@ images = [
 log4lab = "log4lab.cli:app"
 
 [tool.setuptools]
-packages = ["log4lab"]
+packages = {find = {}}
+
+[tool.setuptools.package-data]
+log4lab = ["templates/*.html"]
 
 [build-system]
 requires = ["setuptools>=45", "wheel"]
