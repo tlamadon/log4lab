@@ -1,4 +1,4 @@
-"""Tests for LogBoard server endpoints."""
+"""Tests for Log4Lab server endpoints."""
 import json
 import tempfile
 from pathlib import Path
@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 from fastapi.testclient import TestClient
 
-from logboard import server
+from log4lab import server
 
 
 @pytest.fixture
@@ -70,7 +70,7 @@ def test_index_page(client):
     """Test that the index page loads successfully."""
     response = client.get("/")
     assert response.status_code == 200
-    assert "LogBoard" in response.text
+    assert "Log4Lab" in response.text
     assert "Live" in response.text
 
 
@@ -78,7 +78,7 @@ def test_runs_page(client):
     """Test that the runs index page loads successfully."""
     response = client.get("/runs")
     assert response.status_code == 200
-    assert "LogBoard" in response.text
+    assert "Log4Lab" in response.text
     assert "Runs Index" in response.text
 
 

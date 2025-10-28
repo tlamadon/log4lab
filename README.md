@@ -1,8 +1,8 @@
-# LogBoard
+# Log4Lab
 
 A powerful, lightweight structured log viewer with live streaming, advanced filtering, and run tracking capabilities.
 
-LogBoard is a web-based dashboard for viewing and analyzing structured JSON logs in real-time. It provides a clean, modern interface for monitoring application logs with live updates, making it easy to track experiments, debug issues, and understand what's happening in your applications.
+Log4Lab is a web-based dashboard for viewing and analyzing structured JSON logs in real-time. It provides a clean, modern interface for monitoring application logs with live updates, making it easy to track experiments, debug issues, and understand what's happening in your applications.
 
 ## Features
 
@@ -41,23 +41,29 @@ LogBoard is a web-based dashboard for viewing and analyzing structured JSON logs
 ## Installation
 
 ```bash
-pip install logboard
+pip install log4lab
 ```
 
 Or install from source:
 
 ```bash
-git clone https://github.com/yourusername/logboard.git
-cd logboard
+git clone https://github.com/yourusername/log4lab.git
+cd log4lab
 pip install -e .
 ```
 
 ## Usage
 
-Start the LogBoard server:
+Start the Log4Lab server:
 
 ```bash
-logboard [LOGFILE]
+log4lab serve [LOGFILE]
+```
+
+Or tail logs in the terminal:
+
+```bash
+log4lab tail [LOGFILE]
 ```
 
 ### Options
@@ -70,20 +76,26 @@ logboard [LOGFILE]
 ### Examples
 
 ```bash
-# Use default log file (logs/app.log)
-logboard
+# Web server - Use default log file (logs/app.log)
+log4lab serve
 
 # Specify a custom log file
-logboard /path/to/your/app.log
+log4lab serve /path/to/your/app.log
 
 # Run on a different port
-logboard myapp.log --port 3000
+log4lab serve myapp.log --port 3000
 
 # Bind to all interfaces
-logboard myapp.log --host 0.0.0.0
+log4lab serve myapp.log --host 0.0.0.0
 
 # Development mode with auto-reload
-logboard --reload
+log4lab serve --reload
+
+# Terminal tail - live streaming to terminal
+log4lab tail myapp.log
+
+# Tail with filters
+log4lab tail myapp.log --level=ERROR --open-images
 ```
 
 Then open your browser to `http://localhost:8000` to view the dashboard.
@@ -108,7 +120,7 @@ http://localhost:8000/?level=error&run_name=experiment1&time=3600
 
 ## Log Format
 
-LogBoard expects logs in JSONL format (one JSON object per line). Each log entry should be a JSON object.
+Log4Lab expects logs in JSONL format (one JSON object per line). Each log entry should be a JSON object.
 
 ### Basic Example
 
@@ -161,7 +173,7 @@ Any additional fields (metrics, parameters, etc.) are displayed in the expandabl
 
 ### Live Streaming
 
-LogBoard monitors the log file for changes and automatically streams new entries to the browser using Server-Sent Events (SSE). New entries appear at the top with smooth animations, and the "time ago" display updates every 5 seconds.
+Log4Lab monitors the log file for changes and automatically streams new entries to the browser using Server-Sent Events (SSE). New entries appear at the top with smooth animations, and the "time ago" display updates every 5 seconds.
 
 ### Time Display
 
@@ -266,10 +278,10 @@ Compare results across parameter sweeps, review experimental progression, and ac
 
 ## Development
 
-To run LogBoard in development mode with auto-reload:
+To run Log4Lab in development mode with auto-reload:
 
 ```bash
-logboard --reload
+log4lab serve --reload
 ```
 
 ## Requirements
