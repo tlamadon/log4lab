@@ -133,11 +133,11 @@ class LogTailer:
         header = Text(" ").join(header_parts)
 
         # Message (main content)
-        message = entry.get("message") or entry.get("msg", "")
+        message = entry.get("message") or entry.get("msg") or entry.get("event", "")
         message_text = Text(message, style="white")
 
         # Additional fields (exclude known fields)
-        known_fields = {"time", "level", "section", "message", "msg", "run_name", "run_id", "group", "cache_path"}
+        known_fields = {"time", "level", "section", "message", "msg", "event", "run_name", "run_id", "group", "cache_path"}
         extra_fields = {k: v for k, v in entry.items() if k not in known_fields}
 
         content_parts = [message_text]

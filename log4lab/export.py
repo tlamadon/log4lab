@@ -434,7 +434,7 @@ def generate_standalone_html(logs: list, output_path: Path, title: str = "Log4La
     const timeDisplay = entry.time ? `<span class="time-ago font-medium text-gray-700 dark:text-gray-200" data-timestamp="${{entry.time}}">${{timeAgo}}</span>` : '';
 
     const cachePathHtml = renderCachePath(entry);
-    const mainContent = entry.message || entry.msg || '';
+    const mainContent = entry.message || entry.msg || entry.event || '';
 
     const runInfo = [];
     if (entry.run_name) runInfo.push(`run: <span class="font-semibold">${{entry.run_name}}</span>`);

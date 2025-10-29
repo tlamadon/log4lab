@@ -22,7 +22,16 @@ def serve(
 ):
     """Start the Log4Lab web server."""
     server.set_log_path(logfile)
-    uvicorn.run("log4lab.server:app", host=host, port=port, reload=reload)
+    try:
+        uvicorn.run(
+            "log4lab.server:app",
+            host=host,
+            port=port,
+            reload=reload,
+            timeout_graceful_shutdown=0  # Exit immediately on CTRL-C
+        )
+    except KeyboardInterrupt:
+        pass  # Exit immediately without waiting
 
 
 @app.command()

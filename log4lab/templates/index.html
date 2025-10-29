@@ -377,8 +377,8 @@
     const cachePathHtml = renderCachePath(entry.cache_path);
     const runInfoHtml = renderRunInfo(entry);
 
-    // Use 'message' field for HTML content, fallback to 'msg'
-    const mainContent = entry.message || entry.msg || '';
+    // Use 'message' field for HTML content, fallback to 'msg' or 'event'
+    const mainContent = entry.message || entry.msg || entry.event || '';
 
     // Generate unique ID for collapse functionality
     const uniqueId = `json-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -425,7 +425,7 @@
 
     const cachePathHtml = renderCachePath(entry.cache_path);
     const runInfoHtml = renderRunInfo(entry);
-    const mainContent = entry.message || entry.msg || '';
+    const mainContent = entry.message || entry.msg || entry.event || '';
 
     div.innerHTML = `
       <div class="flex justify-between text-sm text-gray-600 dark:text-gray-300">
