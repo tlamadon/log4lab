@@ -45,6 +45,7 @@ Issues = "https://github.com/tlamadon/log4lab/issues"
 test = [
     "pytest>=7.0",
     "pytest-asyncio>=0.21",
+    "pytest-cov>=4.0",
     "httpx>=0.24"
 ]
 images = [
