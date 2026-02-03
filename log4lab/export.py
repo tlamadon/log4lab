@@ -33,6 +33,46 @@ def read_and_encode_image(file_path: Path) -> Optional[str]:
         return None
 
 
+def is_text_file(file_path: Path) -> bool:
+    """Check if a file is a text file that can be syntax highlighted or rendered as markdown.
+
+    Args:
+        file_path: Path to the file
+
+    Returns:
+        True if the file should be treated as text content
+    """
+    if not file_path.exists() or not file_path.is_file():
+        return False
+
+    ext = file_path.suffix.lower().lstrip('.')
+    text_extensions = {
+        'js', 'jsx', 'ts', 'tsx', 'py', 'rb', 'java', 'cpp', 'c', 'cs', 'go', 'rs',
+        'php', 'sh', 'bash', 'zsh', 'sql', 'json', 'yaml', 'yml', 'xml', 'html',
+        'css', 'scss', 'sass', 'less', 'md', 'txt', 'log'
+    }
+    return ext in text_extensions
+
+
+def read_text_content(file_path: Path) -> Optional[str]:
+    """Read text content from a file.
+
+    Args:
+        file_path: Path to the text file
+
+    Returns:
+        Text content or None if file cannot be read
+    """
+    if not file_path.exists() or not file_path.is_file():
+        return None
+
+    try:
+        with file_path.open('r', encoding='utf-8', errors='ignore') as f:
+            return f.read()
+    except Exception:
+        return None
+
+
 def load_logs(log_path: Path) -> list:
     """Load all logs from the JSONL file.
 
@@ -61,7 +101,7 @@ def load_logs(log_path: Path) -> list:
 
 
 def embed_cache_files(logs: list, log_dir: Path) -> list:
-    """Embed cache files (images, etc.) as base64 data URLs.
+    """Embed cache files (images, code, markdown, etc.) as base64 data URLs and text content.
 
     Args:
         logs: List of log entries
@@ -78,11 +118,17 @@ def embed_cache_files(logs: list, log_dir: Path) -> list:
 
         if 'cache_path' in entry_copy and entry_copy['cache_path']:
             cache_path = log_dir / entry_copy['cache_path']
-            data_url = read_and_encode_image(cache_path)
 
+            # Try to read as binary file first (for images, PDFs, etc.)
+            data_url = read_and_encode_image(cache_path)
             if data_url:
-                # Add the embedded data as a new field
                 entry_copy['_embedded_cache'] = data_url
+
+            # Also try to read as text if it's a text file
+            if is_text_file(cache_path):
+                text_content = read_text_content(cache_path)
+                if text_content:
+                    entry_copy['_embedded_cache_text'] = text_content
 
         embedded_logs.append(entry_copy)
 
@@ -111,6 +157,13 @@ def generate_standalone_html(logs: list, output_path: Path, title: str = "Log4La
   <meta charset="UTF-8">
   <title>{title}</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <!-- Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
   <script>
     {tailwind_config}
     if (localStorage.theme === 'dark' ||
@@ -381,11 +434,48 @@ def generate_standalone_html(logs: list, output_path: Path, title: str = "Log4La
     return `${{diffDay}}d ago`;
   }}
 
+  function getFileLanguage(ext) {{
+    const languageMap = {{
+      'js': 'javascript',
+      'jsx': 'jsx',
+      'ts': 'typescript',
+      'tsx': 'tsx',
+      'py': 'python',
+      'rb': 'ruby',
+      'java': 'java',
+      'cpp': 'cpp',
+      'c': 'c',
+      'cs': 'csharp',
+      'go': 'go',
+      'rs': 'rust',
+      'php': 'php',
+      'sh': 'bash',
+      'bash': 'bash',
+      'zsh': 'bash',
+      'sql': 'sql',
+      'json': 'json',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'xml': 'xml',
+      'html': 'html',
+      'css': 'css',
+      'scss': 'scss',
+      'sass': 'sass',
+      'less': 'less',
+      'md': 'markdown',
+      'txt': 'text',
+      'log': 'text'
+    }};
+    return languageMap[ext] || 'text';
+  }}
+
   function renderCachePath(entry) {{
     // Use embedded cache data if available
     if (entry._embedded_cache) {{
       const ext = (entry.cache_path || '').split('.').pop().toLowerCase();
+      const uniqueId = `file-${{Date.now()}}-${{Math.random().toString(36).substr(2, 9)}}`;
 
+      // Images
       if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {{
         return `<div class="mt-2">
           <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cached Artifact:</div>
@@ -394,6 +484,7 @@ def generate_standalone_html(logs: list, output_path: Path, title: str = "Log4La
         </div>`;
       }}
 
+      // PDFs
       if (ext === 'pdf') {{
         return `<div class="mt-2">
           <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cached Artifact (PDF):</div>
@@ -401,6 +492,40 @@ def generate_standalone_html(logs: list, output_path: Path, title: str = "Log4La
         </div>`;
       }}
 
+      // Markdown files
+      if (ext === 'md' && entry._embedded_cache_text) {{
+        return `<div class="mt-2">
+          <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center justify-between">
+            <span>Cached Artifact (Markdown):</span>
+            <button onclick="toggleFileContent('${{uniqueId}}')" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-1 rounded flex items-center gap-1">
+              <span class="arrow transform transition-transform" id="arrow-${{uniqueId}}">▼</span>
+              <span class="btn-text" id="btn-${{uniqueId}}">Hide</span>
+            </button>
+          </div>
+          <div id="content-${{uniqueId}}" class="markdown-content bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded p-3 max-h-96 overflow-y-auto">
+            ${{marked.parse(entry._embedded_cache_text)}}
+          </div>
+        </div>`;
+      }}
+
+      // Code files
+      const language = getFileLanguage(ext);
+      if (['javascript', 'jsx', 'typescript', 'tsx', 'python', 'ruby', 'java', 'cpp', 'c', 'csharp', 'go', 'rust', 'php', 'bash', 'sql', 'json', 'yaml', 'xml', 'html', 'css', 'scss', 'sass', 'less'].includes(language) && entry._embedded_cache_text) {{
+        return `<div class="mt-2">
+          <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center justify-between">
+            <span>Cached Artifact (${{language.toUpperCase()}}):</span>
+            <button onclick="toggleFileContent('${{uniqueId}}')" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-1 rounded flex items-center gap-1">
+              <span class="arrow transform transition-transform" id="arrow-${{uniqueId}}">▶</span>
+              <span class="btn-text" id="btn-${{uniqueId}}">Show</span>
+            </button>
+          </div>
+          <div id="content-${{uniqueId}}" class="hidden code-content bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded max-h-96 overflow-y-auto">
+            <pre class="text-sm"><code class="language-${{language}}">${{entry._embedded_cache_text.replace(/[<>&"']/g, function(m) {{ return {{ '<': '&lt;', '>': '&gt;', '&': '&amp;', '"': '&quot;', "'": '&#39;' }}[m]; }})}}</code></pre>
+          </div>
+        </div>`;
+      }}
+
+      // Other files
       return `<div class="mt-2">
         <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cached Artifact:</div>
         <a href="${{entry._embedded_cache}}" download="${{entry.cache_path}}" class="text-sm text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
@@ -550,6 +675,38 @@ def generate_standalone_html(logs: list, output_path: Path, title: str = "Log4La
     currentPage = 1;
     renderLogs();
   }};
+
+  // File content toggle function
+  window.toggleFileContent = function(uniqueId) {{
+    const content = document.getElementById(`content-${{uniqueId}}`);
+    const arrow = document.getElementById(`arrow-${{uniqueId}}`);
+    const btn = document.getElementById(`btn-${{uniqueId}}`);
+
+    if (content.classList.contains('hidden')) {{
+      // Show content
+      content.classList.remove('hidden');
+      arrow.style.transform = 'rotate(90deg)';
+      btn.textContent = 'Hide';
+
+      // Apply syntax highlighting for code blocks
+      const codeElement = content.querySelector('code[class*="language-"]');
+      if (codeElement) {{
+        Prism.highlightElement(codeElement);
+      }}
+    }} else {{
+      // Hide content
+      content.classList.add('hidden');
+      arrow.style.transform = 'rotate(0deg)';
+      btn.textContent = 'Show';
+    }}
+  }};
+
+  // Apply syntax highlighting to initially visible markdown code blocks
+  setTimeout(function() {{
+    document.querySelectorAll('.markdown-content pre code').forEach(function(block) {{
+      Prism.highlightElement(block);
+    }});
+  }}, 100);
   </script>
 </body>
 </html>

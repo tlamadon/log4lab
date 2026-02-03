@@ -4,6 +4,13 @@
   <meta charset="UTF-8">
   <title>Log4Lab — Live Structured Logs</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Syntax highlighting -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-dark.min.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-core.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/plugins/autoloader/prism-autoloader.min.js"></script>
+  <!-- Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
   <script>
     if (localStorage.theme === 'dark' ||
         (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
@@ -273,6 +280,9 @@
 
     // Update pagination info
     updatePaginationInfo(filteredLogs);
+
+    // Load markdown files after rendering
+    setTimeout(loadMarkdownFiles, 100);
   }
 
   function getTimeAgo(timestamp) {
@@ -327,11 +337,47 @@
     return `<a href="${url}" class="text-xs text-blue-600 dark:text-blue-400 hover:underline ml-2">🔗 ${parts.join(', ')}</a>`;
   }
 
+  function getFileLanguage(ext) {
+    const languageMap = {
+      'js': 'javascript',
+      'jsx': 'jsx',
+      'ts': 'typescript',
+      'tsx': 'tsx',
+      'py': 'python',
+      'rb': 'ruby',
+      'java': 'java',
+      'cpp': 'cpp',
+      'c': 'c',
+      'cs': 'csharp',
+      'go': 'go',
+      'rs': 'rust',
+      'php': 'php',
+      'sh': 'bash',
+      'bash': 'bash',
+      'zsh': 'bash',
+      'sql': 'sql',
+      'json': 'json',
+      'yaml': 'yaml',
+      'yml': 'yaml',
+      'xml': 'xml',
+      'html': 'html',
+      'css': 'css',
+      'scss': 'scss',
+      'sass': 'sass',
+      'less': 'less',
+      'md': 'markdown',
+      'txt': 'text',
+      'log': 'text'
+    };
+    return languageMap[ext] || 'text';
+  }
+
   function renderCachePath(cachePath) {
     if (!cachePath) return '';
 
     const ext = cachePath.split('.').pop().toLowerCase();
     const cacheUrl = `/cache/${encodeURIComponent(cachePath)}`;
+    const uniqueId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
     // Check if it's an image
     if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {
@@ -349,6 +395,41 @@
         <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Cached Artifact (PDF):</div>
         <embed src="${cacheUrl}" type="application/pdf" class="w-full rounded border border-gray-300 dark:border-gray-600" style="height: 400px;" />
         <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">Open PDF in new tab</a>
+      </div>`;
+    }
+
+    // Check if it's a markdown file
+    if (ext === 'md') {
+      return `<div class="mt-2">
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center justify-between">
+          <span>Cached Artifact (Markdown):</span>
+          <button onclick="toggleFileContent('${uniqueId}')" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-1 rounded flex items-center gap-1">
+            <span class="arrow transform transition-transform" id="arrow-${uniqueId}">▼</span>
+            <span class="btn-text" id="btn-${uniqueId}">Hide</span>
+          </button>
+        </div>
+        <div id="content-${uniqueId}" class="markdown-content bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded p-3 max-h-96 overflow-y-auto">
+          Loading markdown...
+        </div>
+        <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mt-1 inline-block">Open file in new tab</a>
+      </div>`;
+    }
+
+    // Check if it's a code file
+    const language = getFileLanguage(ext);
+    if (['javascript', 'jsx', 'typescript', 'tsx', 'python', 'ruby', 'java', 'cpp', 'c', 'csharp', 'go', 'rust', 'php', 'bash', 'sql', 'json', 'yaml', 'xml', 'html', 'css', 'scss', 'sass', 'less'].includes(language)) {
+      return `<div class="mt-2">
+        <div class="text-xs font-medium text-gray-600 dark:text-gray-400 mb-1 flex items-center justify-between">
+          <span>Cached Artifact (${language.toUpperCase()}):</span>
+          <button onclick="toggleFileContent('${uniqueId}')" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-1 rounded flex items-center gap-1">
+            <span class="arrow transform transition-transform" id="arrow-${uniqueId}">▶</span>
+            <span class="btn-text" id="btn-${uniqueId}">Show</span>
+          </button>
+        </div>
+        <div id="content-${uniqueId}" class="hidden code-content bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded max-h-96 overflow-y-auto">
+          <pre class="text-sm"><code class="language-${language}">Loading code...</code></pre>
+        </div>
+        <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 mt-1 inline-block">Open file in new tab</a>
       </div>`;
     }
 
@@ -497,6 +578,63 @@
 
   // Update time displays every 5 seconds for better responsiveness
   setInterval(updateTimeDisplays, 5000);
+
+  // File content toggle and loading functions
+  window.toggleFileContent = function(uniqueId) {
+    const content = document.getElementById(`content-${uniqueId}`);
+    const arrow = document.getElementById(`arrow-${uniqueId}`);
+    const btn = document.getElementById(`btn-${uniqueId}`);
+
+    if (content.classList.contains('hidden')) {
+      // Show content
+      content.classList.remove('hidden');
+      arrow.style.transform = 'rotate(90deg)';
+      btn.textContent = 'Hide';
+
+      // Load content if not already loaded
+      if (content.querySelector('.markdown-content, .code-content') &&
+          (content.textContent.includes('Loading') || content.querySelector('code')?.textContent.includes('Loading'))) {
+        loadFileContent(uniqueId);
+      }
+    } else {
+      // Hide content
+      content.classList.add('hidden');
+      arrow.style.transform = 'rotate(0deg)';
+      btn.textContent = 'Show';
+    }
+  };
+
+  async function loadFileContent(uniqueId) {
+    const content = document.getElementById(`content-${uniqueId}`);
+    const cacheUrl = content.closest('.mt-2').querySelector('a[href*="/cache/"]').href;
+
+    try {
+      const response = await fetch(cacheUrl);
+      const text = await response.text();
+
+      if (content.classList.contains('markdown-content')) {
+        // Render markdown
+        content.innerHTML = marked.parse(text);
+      } else if (content.classList.contains('code-content')) {
+        // Render code with syntax highlighting
+        const codeElement = content.querySelector('code');
+        codeElement.textContent = text;
+        Prism.highlightElement(codeElement);
+      }
+    } catch (error) {
+      content.innerHTML = `<div class="text-red-500 text-sm">Error loading file: ${error.message}</div>`;
+    }
+  }
+
+  // Load markdown files immediately (since they're shown by default)
+  function loadMarkdownFiles() {
+    document.querySelectorAll('.markdown-content').forEach((element) => {
+      if (element.textContent.includes('Loading')) {
+        const uniqueId = element.id.replace('content-', '');
+        loadFileContent(uniqueId);
+      }
+    });
+  }
 
   // Initial render when page loads
   renderLogs();
