@@ -28,6 +28,12 @@
         <a href="/runs" class="px-3 py-1 rounded border text-sm bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700">
           📋 Runs Index
         </a>
+        <a href="https://github.com/tlamadon/log4lab" target="_blank" class="px-3 py-1 rounded border text-sm bg-white dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700">
+          <svg class="inline-block w-4 h-4 mr-1" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
         <button id="themeToggle"
           class="px-3 py-1 rounded border text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
           Toggle Theme
@@ -94,6 +100,11 @@
         class="bg-blue-100 dark:bg-blue-900 hover:bg-blue-200 dark:hover:bg-blue-800 px-3 py-1 rounded mt-5 text-sm">
         ⬆️ Oldest First
       </button>
+
+      <button id="compactToggle"
+        class="bg-purple-600 text-white hover:bg-purple-700 px-3 py-1 rounded mt-5 text-sm">
+        📦 Compact: ON
+      </button>
     </div>
 
     <div id="log-container" class="space-y-2"></div>
@@ -125,6 +136,21 @@
     </div>
   </div>
 
+  <!-- JSON Modal -->
+  <div id="jsonModal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[80vh] overflow-hidden flex flex-col">
+      <div class="flex justify-between items-center p-4 border-b border-gray-200 dark:border-gray-700">
+        <h3 class="text-lg font-semibold">Log Entry JSON</h3>
+        <button onclick="closeJsonModal()" class="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 text-2xl leading-none">
+          &times;
+        </button>
+      </div>
+      <div class="p-4 overflow-auto flex-1">
+        <pre id="jsonModalContent" class="text-xs bg-gray-100 dark:bg-gray-900 p-3 rounded overflow-x-auto"></pre>
+      </div>
+    </div>
+  </div>
+
   <script>
   const container = document.getElementById("log-container");
   const source = new EventSource("/stream");
@@ -137,6 +163,7 @@
   const clearBtn = document.getElementById("clearFilters");
   const themeToggle = document.getElementById("themeToggle");
   const sortToggle = document.getElementById("sortToggle");
+  const compactToggle = document.getElementById("compactToggle");
 
   // Pagination elements
   const perPageSelect = document.getElementById("perPageSelect");
@@ -153,6 +180,7 @@
   let currentPage = 1;
   let perPage = 50;
   let sortOldestFirst = false;
+  let compactMode = true;
 
   // Parse URL parameters
   function getUrlParams() {
@@ -276,7 +304,30 @@
     const pageLog = sortedLogs.slice(startIdx, endIdx);
 
     // Render logs for current page
-    pageLog.forEach(renderLog);
+    if (compactMode) {
+      // In compact mode, group consecutive one-liners
+      let i = 0;
+      while (i < pageLog.length) {
+        if (isOneLiner(pageLog[i])) {
+          // Found a one-liner, collect consecutive one-liners
+          const group = [pageLog[i]];
+          i++;
+          while (i < pageLog.length && isOneLiner(pageLog[i])) {
+            group.push(pageLog[i]);
+            i++;
+          }
+          // Render the group
+          renderLogGroup(group);
+        } else {
+          // Not a one-liner, render normally
+          renderLog(pageLog[i]);
+          i++;
+        }
+      }
+    } else {
+      // Normal mode: render each log individually
+      pageLog.forEach(renderLog);
+    }
 
     // Update pagination info
     updatePaginationInfo(filteredLogs);
@@ -371,6 +422,40 @@
     };
     return languageMap[ext] || 'text';
   }
+
+  // Check if an entry is a "one-liner" (can be grouped in compact mode)
+  function isOneLiner(entry) {
+    // Must not have a cache_path (no artifacts)
+    // Any entry without artifacts can be grouped, regardless of message length
+    return !entry.cache_path;
+  }
+
+  // Modal functions for JSON display
+  window.openJsonModal = function(entryJson) {
+    const modal = document.getElementById('jsonModal');
+    const content = document.getElementById('jsonModalContent');
+    content.textContent = JSON.stringify(entryJson, null, 2);
+    modal.classList.remove('hidden');
+  };
+
+  window.closeJsonModal = function() {
+    const modal = document.getElementById('jsonModal');
+    modal.classList.add('hidden');
+  };
+
+  // Close modal on background click
+  document.getElementById('jsonModal')?.addEventListener('click', function(e) {
+    if (e.target === this) {
+      closeJsonModal();
+    }
+  });
+
+  // Close modal on Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeJsonModal();
+    }
+  });
 
   function renderCachePath(cachePath) {
     if (!cachePath) return '';
@@ -486,6 +571,50 @@
         </button>
         <pre class="hidden mt-1 text-xs bg-gray-100 dark:bg-gray-900 p-2 rounded overflow-x-auto">${JSON.stringify(entry, null, 2)}</pre>
       </div>
+    `;
+
+    container.appendChild(div);
+  }
+
+  // Render a group of one-liner log entries in compact mode
+  function renderLogGroup(entries) {
+    const div = document.createElement("div");
+    div.className = `p-3 bg-white dark:bg-gray-800 border-l-4 border-gray-400 rounded shadow-sm transition`;
+
+    const groupHtml = entries.map(entry => {
+      const timeAgo = getTimeAgo(entry.time);
+      const timeDisplay = entry.time ? `<span class="time-ago text-xs text-gray-500 dark:text-gray-400 inline-block w-16 flex-shrink-0" data-timestamp="${entry.time}">${timeAgo}</span>` : '<span class="inline-block w-16 flex-shrink-0"></span>';
+      const mainContent = entry.message || entry.msg || entry.event || '';
+      const levelLower = (entry.level || '').toLowerCase();
+      const levelColor =
+        levelLower === "error" ? "text-red-600 dark:text-red-400" :
+        levelLower === "warn" || levelLower === "warning" ? "text-yellow-600 dark:text-yellow-400" :
+        levelLower === "debug" ? "text-gray-500 dark:text-gray-400" :
+        "text-blue-600 dark:text-blue-400";
+
+      return `
+        <div class="py-0.5">
+          <div class="flex items-start gap-2">
+            <div class="flex items-center gap-2 flex-shrink-0">
+              ${timeDisplay}
+              <span class="font-semibold text-xs ${levelColor} inline-block w-12">${entry.level || ''}</span>
+              ${entry.section ? `<span class="text-xs text-gray-500 dark:text-gray-400 inline-block w-24">${entry.section}</span>` : '<span class="inline-block w-24"></span>'}
+            </div>
+            <div class="flex-1 min-w-0 text-xs text-gray-900 dark:text-gray-100 font-mono whitespace-pre-wrap">${mainContent}</div>
+            <button onclick='openJsonModal(${JSON.stringify(entry).replace(/'/g, "&#39;")})'
+                    class="text-[10px] leading-none text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 px-1 py-0.5 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 whitespace-nowrap flex-shrink-0">
+              json
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('');
+
+    div.innerHTML = `
+      <div class="text-xs text-gray-500 dark:text-gray-400 mb-2 font-semibold">
+        ${entries.length} grouped ${entries.length === 1 ? 'entry' : 'entries'}
+      </div>
+      ${groupHtml}
     `;
 
     container.appendChild(div);
@@ -710,6 +839,23 @@
     sortOldestFirst = !sortOldestFirst;
     sortToggle.textContent = sortOldestFirst ? '⬇️ Newest First' : '⬆️ Oldest First';
     currentPage = 1; // Reset to page 1 when changing sort
+    renderLogs();
+  };
+
+  // Compact mode toggle
+  compactToggle.onclick = () => {
+    compactMode = !compactMode;
+
+    if (compactMode) {
+      // ON state
+      compactToggle.className = 'bg-purple-600 text-white hover:bg-purple-700 px-3 py-1 rounded mt-5 text-sm';
+      compactToggle.textContent = '📦 Compact: ON';
+    } else {
+      // OFF state
+      compactToggle.className = 'bg-purple-100 dark:bg-purple-900 hover:bg-purple-200 dark:hover:bg-purple-800 px-3 py-1 rounded mt-5 text-sm';
+      compactToggle.textContent = '📦 Compact View';
+    }
+
     renderLogs();
   };
   </script>
