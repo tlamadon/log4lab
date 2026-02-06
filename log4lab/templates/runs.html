@@ -36,7 +36,7 @@
 
     <div class="mb-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
       <p class="text-sm text-blue-800 dark:text-blue-200">
-        Click on a run name to view all runs, or click on a specific run ID to view that run's logs.
+        Click on any row to view that run's logs. Runs are color-coded by recency (stronger colors = more recent).
       </p>
     </div>
 
@@ -69,10 +69,24 @@
 
     <div id="run-container" class="hidden">
       <div class="mb-4 text-sm text-gray-600 dark:text-gray-400">
-        Found <span id="run-count" class="font-semibold">0</span> unique run names
+        Found <span id="run-count" class="font-semibold">0</span> unique run names with <span id="total-runs" class="font-semibold">0</span> total runs
       </div>
 
-      <div id="run-list" class="space-y-4"></div>
+      <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-300 dark:border-gray-700 overflow-hidden">
+        <table id="run-table" class="w-full">
+          <thead class="bg-gray-100 dark:bg-gray-700 border-b border-gray-300 dark:border-gray-600">
+            <tr>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Run Name</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Date</th>
+              <th class="px-3 py-2 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Last Activity</th>
+              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Entries</th>
+              <th class="px-3 py-2 text-right text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase">Duration</th>
+            </tr>
+          </thead>
+          <tbody id="run-list" class="divide-y divide-gray-200 dark:divide-gray-700">
+          </tbody>
+        </table>
+      </div>
     </div>
 
     <div id="no-runs" class="hidden text-center py-8 text-gray-600 dark:text-gray-400">
@@ -88,6 +102,7 @@
   const noRuns = document.getElementById("no-runs");
   const runList = document.getElementById("run-list");
   const runCount = document.getElementById("run-count");
+  const totalRuns = document.getElementById("total-runs");
 
   themeToggle.onclick = () => {
     const html = document.documentElement;
@@ -151,6 +166,40 @@
     return colors[period] || colors['older'];
   }
 
+  // Helper function to format "time ago" string
+  function formatTimeAgo(timestamp) {
+    if (!timestamp) return { text: 'N/A', isRecent: false };
+
+    let ts = timestamp;
+    if (!ts.endsWith('Z') && !ts.includes('+') && !ts.includes('-', 10)) {
+      ts = ts + 'Z';
+    }
+
+    const date = new Date(ts);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+
+    const isRecent = diffMins <= 15;
+
+    let text;
+    if (diffMins < 1) {
+      text = 'just now';
+    } else if (diffMins < 60) {
+      text = `${diffMins}m ago`;
+    } else if (diffHours < 24) {
+      text = `${diffHours}h ago`;
+    } else if (diffDays < 30) {
+      text = `${diffDays}d ago`;
+    } else {
+      text = `${Math.floor(diffDays / 30)}mo ago`;
+    }
+
+    return { text, isRecent };
+  }
+
   // Helper function to format date and calculate duration
   function formatRunInfo(earliest, latest) {
     if (!earliest) {
@@ -204,52 +253,59 @@
         runContainer.classList.remove('hidden');
         runCount.textContent = Object.keys(data.runs).length;
 
+        // Collect all runs into a flat array for table display
+        const allRuns = [];
         Object.keys(data.runs).sort().forEach(runName => {
           const runData = data.runs[runName];
-          const totalLogs = runData.total;
           const runIds = runData.run_ids;
 
-          const div = document.createElement('div');
-          div.className = 'p-4 bg-white dark:bg-gray-800 border-2 border-gray-300 dark:border-gray-700 rounded';
+          // Add each individual run to the array (most recent first)
+          runIds.slice().reverse().forEach(runIdInfo => {
+            allRuns.push({
+              runName: runName,
+              runId: runIdInfo.run_id,
+              count: runIdInfo.count,
+              earliest: runIdInfo.earliest,
+              latest: runIdInfo.latest
+            });
+          });
+        });
 
-          div.innerHTML = `
-            <div class="flex justify-between items-center mb-3">
-              <div class="flex-1">
-                <a href="/?run_name=${encodeURIComponent(runName)}"
-                   class="text-xl font-semibold text-blue-600 dark:text-blue-400 hover:underline">
-                  ${runName}
-                </a>
-                <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  ${totalLogs} log ${totalLogs === 1 ? 'entry' : 'entries'} across ${runIds.length} run${runIds.length === 1 ? '' : 's'}
-                </p>
-              </div>
-              <div>
-                <a href="/?run_name=${encodeURIComponent(runName)}"
-                   class="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded text-sm">
-                  View All →
-                </a>
-              </div>
-            </div>
-            <div class="border-t border-gray-200 dark:border-gray-700 pt-3 mt-3">
-              <p class="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-2">INDIVIDUAL RUNS (most recent first):</p>
-              <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                ${runIds.slice().reverse().map(runIdInfo => {
-                  const info = formatRunInfo(runIdInfo.earliest, runIdInfo.latest);
-                  const colorClasses = getColorClasses(info.period);
-                  return `
-                  <a href="/?run_id=${encodeURIComponent(runIdInfo.run_id)}"
-                     class="px-3 py-2 ${colorClasses} rounded text-sm border transition">
-                    <div class="text-xs font-semibold text-gray-700 dark:text-gray-200">${info.date}</div>
-                    <div class="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                      Duration: ${info.duration} • ${runIdInfo.count} ${runIdInfo.count === 1 ? 'entry' : 'entries'}
-                    </div>
-                  </a>
-                `}).join('')}
-              </div>
-            </div>
+        totalRuns.textContent = allRuns.length;
+
+        // Render table rows
+        allRuns.forEach(run => {
+          const info = formatRunInfo(run.earliest, run.latest);
+          const lastActivity = formatTimeAgo(run.latest);
+          const colorClasses = getColorClasses(info.period);
+
+          const tr = document.createElement('tr');
+          tr.className = `${colorClasses} hover:opacity-80 transition cursor-pointer`;
+          tr.onclick = () => window.location.href = `/?run_id=${encodeURIComponent(run.runId)}`;
+
+          const redDot = lastActivity.isRecent
+            ? '<span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1.5 animate-pulse" title="Active in last 15 minutes"></span>'
+            : '';
+
+          tr.innerHTML = `
+            <td class="px-3 py-1.5 text-xs font-medium text-gray-900 dark:text-gray-100">
+              ${redDot}${run.runName}
+            </td>
+            <td class="px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300">
+              ${info.date}
+            </td>
+            <td class="px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300">
+              ${lastActivity.text}
+            </td>
+            <td class="px-3 py-1.5 text-xs text-right text-gray-700 dark:text-gray-300">
+              ${run.count}
+            </td>
+            <td class="px-3 py-1.5 text-xs text-right text-gray-700 dark:text-gray-300">
+              ${info.duration}
+            </td>
           `;
 
-          runList.appendChild(div);
+          runList.appendChild(tr);
         });
       } else {
         noRuns.classList.remove('hidden');
