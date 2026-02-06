@@ -38,6 +38,10 @@
           class="px-3 py-1 rounded border text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
           Toggle Theme
         </button>
+        <button id="printBtn"
+          class="px-3 py-1 rounded border text-sm bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800">
+          🖨️ Print
+        </button>
       </div>
     </div>
 
@@ -164,6 +168,7 @@
   const themeToggle = document.getElementById("themeToggle");
   const sortToggle = document.getElementById("sortToggle");
   const compactToggle = document.getElementById("compactToggle");
+  const printBtn = document.getElementById("printBtn");
 
   // Pagination elements
   const perPageSelect = document.getElementById("perPageSelect");
@@ -423,11 +428,10 @@
     return languageMap[ext] || 'text';
   }
 
-  // Check if an entry is a "one-liner" (can be grouped in compact mode)
+  // Check if an entry can be grouped in compact mode
   function isOneLiner(entry) {
-    // Must not have a cache_path (no artifacts)
-    // Any entry without artifacts can be grouped, regardless of message length
-    return !entry.cache_path;
+    // In compact mode, all entries can be grouped together
+    return true;
   }
 
   // Modal functions for JSON display
@@ -554,6 +558,7 @@
         <div class="flex items-center space-x-2">
           ${timeDisplay}
           <span class="text-xs">${entry.time || ''}</span>
+          ${renderFileLocation(entry)}
         </div>
         <div class="flex items-center space-x-2">
           <span class="font-semibold">${entry.level || ''}</span>
@@ -576,7 +581,96 @@
     container.appendChild(div);
   }
 
-  // Render a group of one-liner log entries in compact mode
+  // Render a compact version of cache path artifacts
+  function renderCompactCachePath(cachePath) {
+    if (!cachePath) return '';
+
+    const ext = cachePath.split('.').pop().toLowerCase();
+    const cacheUrl = `/cache/${encodeURIComponent(cachePath)}`;
+    const uniqueId = `file-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+    // Check if it's an image
+    if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {
+      return `<div class="mt-1 ml-0">
+        <img src="${cacheUrl}" alt="Artifact" class="max-w-full h-auto rounded border border-gray-300 dark:border-gray-600 cursor-pointer"
+             onclick="window.open('${cacheUrl}', '_blank')"
+             style="max-height: 300px; object-fit: contain;" />
+      </div>`;
+    }
+
+    // Check if it's a PDF
+    if (ext === 'pdf') {
+      return `<div class="mt-1 ml-0">
+        <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
+          📄 ${cachePath}
+        </a>
+      </div>`;
+    }
+
+    // Check if it's a markdown file
+    if (ext === 'md') {
+      return `<div class="mt-1 ml-0">
+        <div class="flex items-center gap-2">
+          <button onclick="toggleFileContent('${uniqueId}')" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-0.5 rounded">
+            <span class="arrow transform transition-transform" id="arrow-${uniqueId}">▶</span>
+            <span class="btn-text" id="btn-${uniqueId}">Show Markdown</span>
+          </button>
+          <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">📎 Open</a>
+        </div>
+        <div id="content-${uniqueId}" class="hidden markdown-content bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded p-2 mt-1 max-h-64 overflow-y-auto text-xs">
+          Loading markdown...
+        </div>
+      </div>`;
+    }
+
+    // Check if it's a code file
+    const language = getFileLanguage(ext);
+    if (['javascript', 'jsx', 'typescript', 'tsx', 'python', 'ruby', 'java', 'cpp', 'c', 'csharp', 'go', 'rust', 'php', 'bash', 'sql', 'json', 'yaml', 'xml', 'html', 'css', 'scss', 'sass', 'less'].includes(language)) {
+      return `<div class="mt-1 ml-0">
+        <div class="flex items-center gap-2">
+          <button onclick="toggleFileContent('${uniqueId}')" class="text-xs bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 px-2 py-0.5 rounded">
+            <span class="arrow transform transition-transform" id="arrow-${uniqueId}">▶</span>
+            <span class="btn-text" id="btn-${uniqueId}">Show ${language.toUpperCase()}</span>
+          </button>
+          <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300">📎 Open</a>
+        </div>
+        <div id="content-${uniqueId}" class="hidden code-content bg-gray-50 dark:bg-gray-900 border border-gray-300 dark:border-gray-600 rounded mt-1 max-h-64 overflow-y-auto">
+          <pre class="text-xs"><code class="language-${language}">Loading code...</code></pre>
+        </div>
+      </div>`;
+    }
+
+    // For other file types, just show a link
+    return `<div class="mt-1 ml-0">
+      <a href="${cacheUrl}" target="_blank" class="text-xs text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 underline">
+        📎 ${cachePath}
+      </a>
+    </div>`;
+  }
+
+  // Helper function to render file location link
+  function renderFileLocation(entry) {
+    if (!entry.file || !entry.line) return '';
+
+    const fileName = entry.file.split('/').pop();
+
+    // Strip workspace prefix for dev container compatibility
+    const workspacePrefix = '/home/jovyan/workspace';
+    let relativePath = entry.file;
+    if (entry.file.startsWith(workspacePrefix)) {
+      relativePath = entry.file.substring(workspacePrefix.length);
+    }
+
+    const vscodeUrl = `vscode://file${relativePath}:${entry.line}`;
+
+    return `<a href="${vscodeUrl}"
+               class="text-[10px] text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400 ml-2"
+               title="${entry.file}:${entry.line}">
+              📍 ${fileName}:${entry.line}
+            </a>`;
+  }
+
+  // Render a group of log entries in compact mode
   function renderLogGroup(entries) {
     const div = document.createElement("div");
     div.className = `p-3 bg-white dark:bg-gray-800 border-l-4 border-gray-400 rounded shadow-sm transition`;
@@ -592,6 +686,9 @@
         levelLower === "debug" ? "text-gray-500 dark:text-gray-400" :
         "text-blue-600 dark:text-blue-400";
 
+      const artifactHtml = renderCompactCachePath(entry.cache_path);
+      const fileLocationHtml = renderFileLocation(entry);
+
       return `
         <div class="py-0.5">
           <div class="flex items-start gap-2">
@@ -600,11 +697,17 @@
               <span class="font-semibold text-xs ${levelColor} inline-block w-12">${entry.level || ''}</span>
               ${entry.section ? `<span class="text-xs text-gray-500 dark:text-gray-400 inline-block w-24">${entry.section}</span>` : '<span class="inline-block w-24"></span>'}
             </div>
-            <div class="flex-1 min-w-0 text-xs text-gray-900 dark:text-gray-100 font-mono whitespace-pre-wrap">${mainContent}</div>
-            <button onclick='openJsonModal(${JSON.stringify(entry).replace(/'/g, "&#39;")})'
-                    class="text-[10px] leading-none text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 px-1 py-0.5 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 whitespace-nowrap flex-shrink-0">
-              json
-            </button>
+            <div class="flex-1 min-w-0">
+              <div class="text-xs text-gray-900 dark:text-gray-100 font-mono whitespace-pre-wrap">${mainContent}</div>
+              ${artifactHtml}
+            </div>
+            <div class="flex items-center gap-1 flex-shrink-0">
+              ${fileLocationHtml}
+              <button onclick='openJsonModal(${JSON.stringify(entry).replace(/'/g, "&#39;")})'
+                      class="text-[10px] leading-none text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 px-1 py-0.5 rounded border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 whitespace-nowrap flex-shrink-0">
+                json
+              </button>
+            </div>
           </div>
         </div>
       `;
@@ -642,6 +745,7 @@
         <div class="flex items-center space-x-2">
           ${timeDisplay}
           <span class="text-xs">${entry.time || ''}</span>
+          ${renderFileLocation(entry)}
         </div>
         <div class="flex items-center space-x-2">
           <span class="font-semibold">${entry.level || ''}</span>
@@ -718,24 +822,80 @@
       // Show content
       content.classList.remove('hidden');
       arrow.style.transform = 'rotate(90deg)';
-      btn.textContent = 'Hide';
+
+      // Update button text based on content type
+      const isMarkdown = content.classList.contains('markdown-content');
+      const isCode = content.classList.contains('code-content');
+      if (isMarkdown || isCode) {
+        btn.textContent = 'Hide';
+      } else {
+        btn.textContent = 'Hide';
+      }
 
       // Load content if not already loaded
-      if (content.querySelector('.markdown-content, .code-content') &&
-          (content.textContent.includes('Loading') || content.querySelector('code')?.textContent.includes('Loading'))) {
+      // Check if content contains "Loading" text or if code element contains "Loading"
+      const needsLoading = content.textContent.includes('Loading') ||
+                          content.querySelector('code')?.textContent.includes('Loading');
+
+      if (needsLoading) {
         loadFileContent(uniqueId);
       }
     } else {
       // Hide content
       content.classList.add('hidden');
       arrow.style.transform = 'rotate(0deg)';
-      btn.textContent = 'Show';
+
+      // Update button text based on content type
+      const isMarkdown = content.classList.contains('markdown-content');
+      const isCode = content.classList.contains('code-content');
+      if (isMarkdown) {
+        btn.textContent = 'Show Markdown';
+      } else if (isCode) {
+        // Try to extract language from button text or code class
+        const codeElement = content.querySelector('code');
+        if (codeElement) {
+          const langClass = Array.from(codeElement.classList).find(c => c.startsWith('language-'));
+          const lang = langClass ? langClass.replace('language-', '').toUpperCase() : 'Code';
+          btn.textContent = `Show ${lang}`;
+        } else {
+          btn.textContent = 'Show';
+        }
+      } else {
+        btn.textContent = 'Show';
+      }
     }
   };
 
   async function loadFileContent(uniqueId) {
     const content = document.getElementById(`content-${uniqueId}`);
-    const cacheUrl = content.closest('.mt-2').querySelector('a[href*="/cache/"]').href;
+
+    // Find the cache URL - try multiple strategies
+    let cacheLink = null;
+
+    // Strategy 1: Look in parent element (compact view)
+    if (content.parentElement) {
+      cacheLink = content.parentElement.querySelector('a[href*="/cache/"]');
+    }
+
+    // Strategy 2: Look in closest .mt-2 or .mt-1 container
+    if (!cacheLink) {
+      const container = content.closest('.mt-2') || content.closest('.mt-1');
+      if (container) {
+        cacheLink = container.querySelector('a[href*="/cache/"]');
+      }
+    }
+
+    // Strategy 3: Look in the previous sibling (for compact view where button is before content)
+    if (!cacheLink && content.previousElementSibling) {
+      cacheLink = content.previousElementSibling.querySelector('a[href*="/cache/"]');
+    }
+
+    if (!cacheLink) {
+      content.innerHTML = `<div class="text-red-500 text-sm">Error: Could not find cache URL</div>`;
+      return;
+    }
+
+    const cacheUrl = cacheLink.href;
 
     try {
       const response = await fetch(cacheUrl);
@@ -857,6 +1017,124 @@
     }
 
     renderLogs();
+  };
+
+  // Print functionality - opens a clean print page
+  printBtn.onclick = () => {
+    const filteredLogs = allLogs.filter(matchesFilters);
+
+    if (filteredLogs.length === 0) {
+      alert('No logs to print with current filters.');
+      return;
+    }
+
+    // Sort by time (oldest first for chronological reading)
+    const sortedByTime = filteredLogs.slice().sort((a, b) => {
+      const timeA = a.time ? new Date(a.time) : new Date(0);
+      const timeB = b.time ? new Date(b.time) : new Date(0);
+      return timeA - timeB;
+    });
+
+    const firstEntry = sortedByTime[0];
+    const lastEntry = sortedByTime[sortedByTime.length - 1];
+
+    // Format date
+    const formatDateTime = (timestamp) => {
+      if (!timestamp) return '-';
+      const date = new Date(timestamp);
+      return date.toLocaleString();
+    };
+
+    // Calculate duration
+    const calculateDuration = (start, end) => {
+      if (!start || !end) return '-';
+      const diffMs = new Date(end) - new Date(start);
+      if (diffMs < 0) return '-';
+      const diffSec = Math.floor(diffMs / 1000);
+      const diffMin = Math.floor(diffSec / 60);
+      const diffHour = Math.floor(diffMin / 60);
+      const diffDay = Math.floor(diffHour / 24);
+      if (diffDay > 0) return `${diffDay}d ${diffHour % 24}h ${diffMin % 60}m`;
+      if (diffHour > 0) return `${diffHour}h ${diffMin % 60}m ${diffSec % 60}s`;
+      if (diffMin > 0) return `${diffMin}m ${diffSec % 60}s`;
+      return `${diffSec}s`;
+    };
+
+    // Build active filters list
+    const activeFilters = [];
+    if (levelFilter.value) activeFilters.push(`Level: ${levelFilter.value}`);
+    if (sectionFilter.value) activeFilters.push(`Section: ${sectionFilter.value}`);
+    if (groupFilter.value) activeFilters.push(`Group: ${groupFilter.value}`);
+    if (runNameFilter.value) activeFilters.push(`Run Name: ${runNameFilter.value}`);
+    if (runIdFilter.value) activeFilters.push(`Run ID: ${runIdFilter.value}`);
+    if (timeFilter.value) {
+      const timeLabels = { '60': '1 min', '300': '5 min', '600': '10 min', '1800': '30 min', '3600': '1 hour', '21600': '6 hours', '86400': '24 hours' };
+      activeFilters.push(`Time: Last ${timeLabels[timeFilter.value] || timeFilter.value + 's'}`);
+    }
+
+    // Generate log content HTML
+    const logsHtml = sortedByTime.map(entry => {
+      const content = entry.message || entry.msg || entry.event || '';
+      const section = entry.section ? `<span style="color: #666; font-size: 12px;">[${entry.section}]</span> ` : '';
+
+      // Handle cached images
+      let imageHtml = '';
+      if (entry.cache_path) {
+        const ext = entry.cache_path.split('.').pop().toLowerCase();
+        if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp'].includes(ext)) {
+          const cacheUrl = `/cache/${encodeURIComponent(entry.cache_path)}`;
+          imageHtml = `<div style="margin-top: 8px; text-align: center;"><img src="${cacheUrl}" style="max-width: 100%; max-height: 400px; object-fit: contain;"></div>`;
+        }
+      }
+
+      return `<div style="margin-bottom: 6px; page-break-inside: avoid;">
+        ${section}<span style="font-family: monospace; white-space: pre-wrap;">${content}</span>
+        ${imageHtml}
+      </div>`;
+    }).join('');
+
+    // Create print page HTML
+    const printHtml = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Log4Lab Report</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; color: #333; }
+    .header { border-bottom: 2px solid #333; padding-bottom: 16px; margin-bottom: 24px; }
+    .header h1 { margin: 0 0 12px 0; font-size: 24px; }
+    .header p { margin: 4px 0; font-size: 14px; color: #555; }
+    .filters { background: #f5f5f5; padding: 8px 12px; border-radius: 4px; margin-top: 12px; font-size: 13px; }
+    .content { line-height: 1.3; }
+    img { page-break-inside: avoid; }
+    @media print {
+      body { padding: 0; }
+      img { max-height: 500px !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h1>Log4Lab Report</h1>
+    <p><strong>First Entry:</strong> ${formatDateTime(firstEntry?.time)}</p>
+    <p><strong>Last Entry:</strong> ${formatDateTime(lastEntry?.time)}</p>
+    <p><strong>Duration:</strong> ${calculateDuration(firstEntry?.time, lastEntry?.time)}</p>
+    <p><strong>Entries:</strong> ${sortedByTime.length}</p>
+    ${activeFilters.length > 0 ? `<div class="filters"><strong>Filters:</strong> ${activeFilters.join(' | ')}</div>` : ''}
+  </div>
+  <div class="content">
+    ${logsHtml}
+  </div>
+</body>
+</html>`;
+
+    // Open new window and print
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(printHtml);
+    printWindow.document.close();
+    printWindow.onload = () => {
+      printWindow.print();
+    };
   };
   </script>
 </body>
