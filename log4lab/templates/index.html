@@ -35,10 +35,6 @@
           </svg>
           GitHub
         </a>
-        <button id="themeToggle"
-          class="px-3 py-1 rounded border text-sm bg-gray-200 dark:bg-gray-800 hover:bg-gray-300 dark:hover:bg-gray-700">
-          Toggle Theme
-        </button>
         <button id="printBtn"
           class="px-3 py-1 rounded border text-sm bg-green-100 dark:bg-green-900 hover:bg-green-200 dark:hover:bg-green-800">
           🖨️ Print
@@ -174,7 +170,6 @@
   const runIdFilter = document.getElementById("runIdFilter");
   const timeFilter = document.getElementById("timeFilter");
   const clearBtn = document.getElementById("clearFilters");
-  const themeToggle = document.getElementById("themeToggle");
   const sortToggle = document.getElementById("sortToggle");
   const compactToggle = document.getElementById("compactToggle");
   const printBtn = document.getElementById("printBtn");
@@ -228,17 +223,6 @@
 
   // Apply filters from URL on page load
   applyUrlParams();
-
-  themeToggle.onclick = () => {
-    const html = document.documentElement;
-    if (html.classList.contains('dark')) {
-      html.classList.remove('dark');
-      localStorage.theme = 'light';
-    } else {
-      html.classList.add('dark');
-      localStorage.theme = 'dark';
-    }
-  };
 
   function matchesFilters(entry) {
     const level = levelFilter.value.toLowerCase();
