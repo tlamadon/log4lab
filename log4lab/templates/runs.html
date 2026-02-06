@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>Log4Lab — Run IDs</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke-linecap='round' stroke-linejoin='round'><path d='M4 3v18h14' stroke='%234F46E5' stroke-width='3'/><circle cx='14' cy='10' r='5' stroke='%236366F1' stroke-width='2' fill='white'/><line x1='18' y1='14' x2='21' y2='17' stroke='%236366F1' stroke-width='2'/></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     if (localStorage.theme === 'dark' ||
@@ -243,79 +244,171 @@
     };
   }
 
-  // Fetch runs from server
-  fetch('/api/runs')
-    .then(response => response.json())
-    .then(data => {
-      loading.classList.add('hidden');
+  // Track current runs for incremental updates
+  let currentRuns = new Map();
 
-      if (data.runs && Object.keys(data.runs).length > 0) {
-        runContainer.classList.remove('hidden');
-        runCount.textContent = Object.keys(data.runs).length;
+  // Create a table row for a run
+  function createRunRow(run) {
+    const info = formatRunInfo(run.earliest, run.latest);
+    const lastActivity = formatTimeAgo(run.latest);
+    const colorClasses = getColorClasses(info.period);
 
-        // Collect all runs into a flat array for table display
-        const allRuns = [];
-        Object.keys(data.runs).sort().forEach(runName => {
-          const runData = data.runs[runName];
-          const runIds = runData.run_ids;
+    const tr = document.createElement('tr');
+    tr.dataset.runId = run.runId;
+    tr.dataset.latest = run.latest || '';
+    tr.dataset.count = run.count;
+    tr.className = `${colorClasses} hover:opacity-80 transition cursor-pointer`;
+    tr.onclick = () => window.location.href = `/?run_id=${encodeURIComponent(run.runId)}&run_name=${encodeURIComponent(run.runName)}`;
 
-          // Add each individual run to the array (most recent first)
-          runIds.slice().reverse().forEach(runIdInfo => {
-            allRuns.push({
-              runName: runName,
-              runId: runIdInfo.run_id,
-              count: runIdInfo.count,
-              earliest: runIdInfo.earliest,
-              latest: runIdInfo.latest
-            });
-          });
+    const redDot = lastActivity.isRecent
+      ? '<span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1.5 animate-pulse" title="Active in last 15 minutes"></span>'
+      : '';
+
+    tr.innerHTML = `
+      <td class="px-3 py-1.5 text-xs font-medium text-gray-900 dark:text-gray-100">
+        ${redDot}${run.runName}
+      </td>
+      <td class="px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300">
+        ${info.date}
+      </td>
+      <td class="px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300">
+        ${lastActivity.text}
+      </td>
+      <td class="px-3 py-1.5 text-xs text-right text-gray-700 dark:text-gray-300">
+        ${run.count}
+      </td>
+      <td class="px-3 py-1.5 text-xs text-right text-gray-700 dark:text-gray-300">
+        ${info.duration}
+      </td>
+    `;
+
+    return tr;
+  }
+
+  // Update runs table incrementally
+  function updateRuns(data) {
+    if (!data.runs || Object.keys(data.runs).length === 0) {
+      runContainer.classList.add('hidden');
+      noRuns.classList.remove('hidden');
+      runList.innerHTML = '';
+      currentRuns.clear();
+      return;
+    }
+
+    runContainer.classList.remove('hidden');
+    noRuns.classList.add('hidden');
+    runCount.textContent = Object.keys(data.runs).length;
+
+    // Collect all runs into a flat array
+    const allRuns = [];
+    Object.keys(data.runs).forEach(runName => {
+      const runData = data.runs[runName];
+      runData.run_ids.forEach(runIdInfo => {
+        allRuns.push({
+          runName: runName,
+          runId: runIdInfo.run_id,
+          count: runIdInfo.count,
+          earliest: runIdInfo.earliest,
+          latest: runIdInfo.latest
         });
+      });
+    });
 
-        totalRuns.textContent = allRuns.length;
+    // Sort by time (newest first)
+    allRuns.sort((a, b) => {
+      const timeA = a.earliest ? new Date(a.earliest) : new Date(0);
+      const timeB = b.earliest ? new Date(b.earliest) : new Date(0);
+      return timeB - timeA;
+    });
 
-        // Render table rows
-        allRuns.forEach(run => {
+    totalRuns.textContent = allRuns.length;
+
+    // Build a map of new runs
+    const newRuns = new Map(allRuns.map(run => [run.runId, run]));
+
+    // Remove rows that no longer exist
+    currentRuns.forEach((run, runId) => {
+      if (!newRuns.has(runId)) {
+        const row = runList.querySelector(`tr[data-run-id="${runId}"]`);
+        if (row) row.remove();
+        currentRuns.delete(runId);
+      }
+    });
+
+    // Update existing rows and add new ones
+    allRuns.forEach((run, index) => {
+      const existingRow = runList.querySelector(`tr[data-run-id="${run.runId}"]`);
+
+      if (existingRow) {
+        // Check if data changed
+        const oldRun = currentRuns.get(run.runId);
+        if (oldRun && (oldRun.latest !== run.latest || oldRun.count !== run.count)) {
+          // Replace with updated row
+          const newRow = createRunRow(run);
+          existingRow.replaceWith(newRow);
+        } else {
+          // Just update time ago display
           const info = formatRunInfo(run.earliest, run.latest);
           const lastActivity = formatTimeAgo(run.latest);
-          const colorClasses = getColorClasses(info.period);
+          const cells = existingRow.querySelectorAll('td');
+          if (cells[2]) cells[2].textContent = lastActivity.text;
+          if (cells[4]) cells[4].textContent = info.duration;
 
-          const tr = document.createElement('tr');
-          tr.className = `${colorClasses} hover:opacity-80 transition cursor-pointer`;
-          tr.onclick = () => window.location.href = `/?run_id=${encodeURIComponent(run.runId)}`;
+          // Update red dot status
+          const firstCell = cells[0];
+          const hasRedDot = firstCell.querySelector('.animate-pulse');
+          if (lastActivity.isRecent && !hasRedDot) {
+            firstCell.innerHTML = `<span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1.5 animate-pulse" title="Active in last 15 minutes"></span>${run.runName}`;
+          } else if (!lastActivity.isRecent && hasRedDot) {
+            firstCell.textContent = run.runName;
+          }
+        }
 
-          const redDot = lastActivity.isRecent
-            ? '<span class="inline-block w-2 h-2 bg-red-500 rounded-full mr-1.5 animate-pulse" title="Active in last 15 minutes"></span>'
-            : '';
-
-          tr.innerHTML = `
-            <td class="px-3 py-1.5 text-xs font-medium text-gray-900 dark:text-gray-100">
-              ${redDot}${run.runName}
-            </td>
-            <td class="px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300">
-              ${info.date}
-            </td>
-            <td class="px-3 py-1.5 text-xs text-gray-700 dark:text-gray-300">
-              ${lastActivity.text}
-            </td>
-            <td class="px-3 py-1.5 text-xs text-right text-gray-700 dark:text-gray-300">
-              ${run.count}
-            </td>
-            <td class="px-3 py-1.5 text-xs text-right text-gray-700 dark:text-gray-300">
-              ${info.duration}
-            </td>
-          `;
-
-          runList.appendChild(tr);
-        });
+        // Ensure correct position in sorted order
+        const currentIndex = Array.from(runList.children).indexOf(existingRow);
+        if (currentIndex !== index) {
+          if (index === 0) {
+            runList.prepend(existingRow);
+          } else {
+            runList.children[index - 1].after(existingRow);
+          }
+        }
       } else {
-        noRuns.classList.remove('hidden');
+        // Insert new row at correct position
+        const newRow = createRunRow(run);
+        if (index === 0) {
+          runList.prepend(newRow);
+        } else if (runList.children[index]) {
+          runList.children[index].before(newRow);
+        } else {
+          runList.appendChild(newRow);
+        }
       }
-    })
-    .catch(error => {
-      loading.classList.add('hidden');
-      noRuns.classList.remove('hidden');
-      console.error('Error fetching runs:', error);
+
+      currentRuns.set(run.runId, run);
     });
+  }
+
+  // Fetch runs from server
+  function fetchRuns() {
+    return fetch('/api/runs')
+      .then(response => response.json())
+      .then(data => {
+        loading.classList.add('hidden');
+        updateRuns(data);
+      })
+      .catch(error => {
+        loading.classList.add('hidden');
+        noRuns.classList.remove('hidden');
+        console.error('Error fetching runs:', error);
+      });
+  }
+
+  // Initial fetch
+  fetchRuns();
+
+  // Auto-refresh every 10 seconds
+  setInterval(fetchRuns, 10000);
   </script>
 </body>
 </html>
