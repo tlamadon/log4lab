@@ -1,5 +1,9 @@
 .PHONY: help release-minor release-patch release-major test clean install docs
 
+# Python executable (use venv if available)
+PYTHON := $(shell if [ -f .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
+PYTEST := $(shell if [ -f .venv/bin/pytest ]; then echo .venv/bin/pytest; else echo pytest; fi)
+
 # Colors for output
 BLUE := \033[0;34m
 GREEN := \033[0;32m
@@ -34,11 +38,11 @@ release-minor: ## Create a new minor release (v0.4.4 -> v0.5.0)
 	@echo "Bumping from $(YELLOW)$(CURRENT_TAG)$(NC) to $(GREEN)$(NEW_TAG)$(NC)"
 	@echo ""
 	@echo "$(BLUE)Step 1:$(NC) Updating pyproject.toml..."
-	@sed -i 's/^version = ".*"/version = "$(NEW_VERSION)"/' pyproject.toml
+	@sed -i '' 's/^version = ".*"/version = "$(NEW_VERSION)"/' pyproject.toml
 	@echo "$(GREEN)✓$(NC) Updated pyproject.toml to version $(NEW_VERSION)"
 	@echo ""
 	@echo "$(BLUE)Step 2:$(NC) Running tests..."
-	@pytest tests/ -q || (echo "$(YELLOW)⚠$(NC) Tests failed! Fix them before releasing." && exit 1)
+	@$(PYTEST) tests/ -q || (echo "$(YELLOW)⚠$(NC) Tests failed! Fix them before releasing." && exit 1)
 	@echo "$(GREEN)✓$(NC) Tests passed"
 	@echo ""
 	@echo "$(BLUE)Step 3:$(NC) Committing changes..."
@@ -72,11 +76,11 @@ release-patch: ## Create a new patch release (v0.4.4 -> v0.4.5)
 	@echo "Bumping from $(YELLOW)$(CURRENT_TAG)$(NC) to $(GREEN)$(NEW_TAG)$(NC)"
 	@echo ""
 	@echo "$(BLUE)Step 1:$(NC) Updating pyproject.toml..."
-	@sed -i 's/^version = ".*"/version = "$(NEW_VERSION)"/' pyproject.toml
+	@sed -i '' 's/^version = ".*"/version = "$(NEW_VERSION)"/' pyproject.toml
 	@echo "$(GREEN)✓$(NC) Updated pyproject.toml to version $(NEW_VERSION)"
 	@echo ""
 	@echo "$(BLUE)Step 2:$(NC) Running tests..."
-	@pytest tests/ -q || (echo "$(YELLOW)⚠$(NC) Tests failed! Fix them before releasing." && exit 1)
+	@$(PYTEST) tests/ -q || (echo "$(YELLOW)⚠$(NC) Tests failed! Fix them before releasing." && exit 1)
 	@echo "$(GREEN)✓$(NC) Tests passed"
 	@echo ""
 	@echo "$(BLUE)Step 3:$(NC) Committing changes..."
@@ -115,11 +119,11 @@ release-major: ## Create a new major release (v0.4.4 -> v1.0.0)
 	fi
 	@echo ""
 	@echo "$(BLUE)Step 1:$(NC) Updating pyproject.toml..."
-	@sed -i 's/^version = ".*"/version = "$(NEW_VERSION)"/' pyproject.toml
+	@sed -i '' 's/^version = ".*"/version = "$(NEW_VERSION)"/' pyproject.toml
 	@echo "$(GREEN)✓$(NC) Updated pyproject.toml to version $(NEW_VERSION)"
 	@echo ""
 	@echo "$(BLUE)Step 2:$(NC) Running tests..."
-	@pytest tests/ -q || (echo "$(YELLOW)⚠$(NC) Tests failed! Fix them before releasing." && exit 1)
+	@$(PYTEST) tests/ -q || (echo "$(YELLOW)⚠$(NC) Tests failed! Fix them before releasing." && exit 1)
 	@echo "$(GREEN)✓$(NC) Tests passed"
 	@echo ""
 	@echo "$(BLUE)Step 3:$(NC) Committing changes..."
@@ -139,13 +143,13 @@ release-major: ## Create a new major release (v0.4.4 -> v1.0.0)
 	@echo "  GitHub Actions will now build and publish to PyPI."
 
 test: ## Run tests
-	@pytest tests/ -v
+	@$(PYTEST) tests/ -v
 
 test-cov: ## Run tests with coverage
-	@pytest tests/ -v --cov=log4lab --cov-report=term-missing
+	@$(PYTEST) tests/ -v --cov=log4lab --cov-report=term-missing
 
 test-fast: ## Run tests quickly (no output)
-	@pytest tests/ -q
+	@$(PYTEST) tests/ -q
 
 
 lint: ## Run linting
