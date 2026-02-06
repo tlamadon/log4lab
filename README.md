@@ -1,5 +1,7 @@
 # Log4Lab
 
+[![PyPI version](https://img.shields.io/pypi/v/log4lab.svg)](https://pypi.org/project/log4lab/)
+
 A lightweight structured log viewer with live streaming, filtering, and rich content rendering.
 
 Log4Lab is a web-based dashboard for viewing and analyzing structured JSON logs in real-time. It provides a clean interface for monitoring application logs with live updates, making it easy to track experiments and debug issues.
